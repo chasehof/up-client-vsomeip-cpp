@@ -64,12 +64,10 @@ $ export LOCAL_VSOMEIP_PATH=/usr/local
 $ conan create .
 ```
 
-## 4. Examples & using the library
-Examples provided, are the best place to start customization and learn about how to use the library.
+## 4. Examples
+Refer to [EXAMPLES](examples/README.md)
 
-Refer to their[EXAMPLES](examples/README.md)
-
-## 5. Troubleshooting tips
+## 5. Troubleshooting for common issues
 - If not able to find a library, check using:
 ```
 ldconfig -p |grep <lib_name>

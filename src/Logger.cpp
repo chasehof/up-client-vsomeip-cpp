@@ -34,7 +34,7 @@ void handleLogLevelSignal(int signal, siginfo_t *sip, void *ptr) {
     }
 }
 
-void setupLogger() {
+void setupLogger(std::shared_ptr<spdlog::logger> logger)  {
     struct sigaction sa;
     memset(&sa, 0, sizeof (sa));
     sa.sa_sigaction = handleLogLevelSignal;
@@ -48,7 +48,9 @@ void setupLogger() {
     auto stdout_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt >();
     auto rotating_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>("logs/main.log", max_size, max_files);
     std::vector<spdlog::sink_ptr> sinks {stdout_sink, rotating_sink};
-    auto logger = std::make_shared<spdlog::logger>("streamer-log", sinks.begin(), sinks.end());
+    if (!logger) {
+        logger = std::make_shared<spdlog::logger>("streamer-log", sinks.begin(), sinks.end());
+    }
 
     spdlog::set_default_logger(logger);
     spdlog::default_logger()->info("===================== START =====================");
