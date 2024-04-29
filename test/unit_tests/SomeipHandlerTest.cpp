@@ -21,26 +21,47 @@ using ::testing::NiceMock;
 using namespace up::vsomeip_client;
 
 /**
- *  @brief Assets needed to make a message.
+ *  @brief UUri for testing.
  */
-auto g_uuidHandler = Uuidv8Factory::create();
 auto const g_testUURI = buildUURI();
-auto const g_priority = UPriority::UPRIORITY_CS4;
-auto const g_publishType = UMessageType::UMESSAGE_TYPE_PUBLISH;
-UAttributesBuilder g_builderHandler(*g_testUURI, g_uuidHandler, g_publishType, g_priority);
-UAttributes g_attributesHandler = g_builderHandler.build();
+
+/**
+ *  @brief Create a UResource object.
+ */
+std::unique_ptr<UResource> createUResource() {
+    uint16_t const uResourceId = 0x0102; //Method ID
+    std::string const uResourceName = "rpc";
+    std::string const uResourceInstance = "0x0102";
+
+    std::unique_ptr<UResource> uResource = std::make_unique<UResource>();
+    uResource->set_id(uResourceId);
+    uResource->set_name(uResourceName.c_str());
+    uResource->set_instance(uResourceInstance);
+
+    return uResource;
+}
+
+/**
+ *  @brief Build a UAttributes object.
+ */
+UAttributes createUAttributes() {
+    auto uuid = Uuidv8Factory::create();
+    auto const uPriority = UPriority::UPRIORITY_CS4;
+    auto const uPublishType = UMessageType::UMESSAGE_TYPE_PUBLISH;
+    UAttributesBuilder uAttributesBuilder(*g_testUURI, uuid, uPublishType, uPriority);
+
+    return uAttributesBuilder.build();
+}
 
 /**
  *  @brief payload for message.
  */
 static uint8_t g_data[4] = "100";
-UPayload g_payloadHandler(g_data, sizeof(g_data), UPayloadType::VALUE);
-
+UPayload g_payloadForHandler(g_data, sizeof(g_data), UPayloadType::VALUE);
 /**
  *  @brief UMessage used for testing.
  */
-UMessage g_messageHandler(g_payloadHandler, g_attributesHandler);
-
+UMessage g_messageHandler(g_payloadForHandler, createUAttributes());
 /**
  *  @brief Parameters for someip calls.
  */
@@ -124,6 +145,31 @@ protected:
     void gethandleInboundSubscription(std::shared_ptr<subscriptionStatus> const subStatus) {
         handlerClient->handleInboundSubscription(subStatus);
     }
+
+    void getActOnBehalfOfSubscriptionAck(eventgroup_t const eventGroup) {
+        handlerClient->actOnBehalfOfSubscriptionAck(eventGroup);
+    }
+
+    size_t getQueueSize() {
+        handlerClient->running_ = true;
+
+        return handlerClient->queue_[0].size();
+    }
+
+    bool getaddSubscriptionForRemoteService(UResourceId_t resourceid,
+                                            std::shared_ptr<ResourceInformation> resourceInfo) {
+        handlerClient->addSubscriptionForRemoteService(resourceid, resourceInfo);
+
+        return handlerClient->subscriptionsForRemoteServices_.find(resourceid) !=
+            handlerClient->subscriptionsForRemoteServices_.end();
+    }
+
+    bool getRemoveSubscriptionForRemoteService(UResourceId_t resourceid) {
+        handlerClient->removeSubscriptionForRemoteService(resourceid);
+
+        return handlerClient->subscriptionsForRemoteServices_.find(resourceid) ==
+            handlerClient->subscriptionsForRemoteServices_.end();
+    }
 };
 
 /**
@@ -196,7 +242,7 @@ TEST_F(SomeipHandlerClientTests, onSubscriptionTest) {
 }
 
 /**
- * @brief Verify the behavior of onSubscription when the client is not subscribed to a service.
+ *  @brief Verify the behavior of onSubscription when the client is not subscribed to a service.
  */
 TEST_F(SomeipHandlerClientTests, onSubscriptionNotSubscribedTest) {
     client_t client = 123;
@@ -209,24 +255,11 @@ TEST_F(SomeipHandlerClientTests, onSubscriptionNotSubscribedTest) {
 }
 
 /**
- * @brief Ensure doesInboundSubscriptionExist returns true only when inbound subscription exists.
+ *  @brief Ensure doesInboundSubscriptionExist returns true only when inbound subscription exists.
  */
 TEST_F(SomeipHandlerClientTests, doesInboundSubscriptionExistTest) {
     eventgroup_t eventGroup = 0x0102;
-
-    /**
-     *  @brief Assets needed to make a UResource object.
-     */
-    uint16_t const g_uResourceIdForHandler           = 0x0102; //Method ID
-    std::string const g_uResourceNameForHandler      = "rpc";
-    std::string const g_uResourceInstanceForHandler  = "0x0102";
-    std::unique_ptr<UResource> uResource = std::make_unique<UResource>();
-    /**
-     *  @brief Set parameters of UResource object.
-     */
-    uResource->set_id(g_uResourceIdForHandler);
-    uResource->set_name(g_uResourceNameForHandler.c_str());
-    uResource->set_instance(g_uResourceInstanceForHandler);
+    std::unique_ptr<UResource> uResource = createUResource();
 
     /**
      *  @brief SubscriptionStatus object. Used to add to the subscriber count using handleInboundSubscription.
@@ -251,6 +284,41 @@ TEST_F(SomeipHandlerClientTests, doesInboundSubscriptionExistTest) {
      */
     gethandleInboundSubscription(subStatusPtr);
     EXPECT_TRUE(getDoesInboundSubscriptionExist(eventGroup));
+}
+
+/**
+ *  @brief Check if the queue size increases when actOnBehalfOfSubscriptionAck is called.
+ *  actOnBehalfOfSubscriptionAck calls onSubscriptionStatus which then calls postMessageToQueue.
+ */
+TEST_F(SomeipHandlerClientTests, actOnBehalfOfSubscriptionAckTest) {
+    eventgroup_t eventGroup = 0x0123;
+    size_t originalSize = getQueueSize();
+
+    getActOnBehalfOfSubscriptionAck(eventGroup);
+    EXPECT_EQ(originalSize + 1, getQueueSize());
+}
+
+/**
+ *  @brief Ensure addSubscriptionForRemoteService adds a subscription for a remote service.
+ */
+TEST_F(SomeipHandlerClientTests, addSubscriptionForRemoteServiceTest) {
+    UResourceId_t resourceId = 0x0102;
+    std::unique_ptr<UResource> resource = createUResource();
+    std::shared_ptr<ResourceInformation> resourceInfo = std::make_shared<ResourceInformation>(*resource);
+
+    EXPECT_TRUE(getaddSubscriptionForRemoteService(resourceId, resourceInfo));
+}
+
+/**
+ *  @brief Ensure removeSubscriptionForRemoteService removes a subscription for a remote service.
+ */
+TEST_F(SomeipHandlerClientTests, removeSubscriptionForRemoteServiceTest) {
+    UResourceId_t resourceId = 0x0102;
+    std::unique_ptr<UResource> resource = createUResource();
+    std::shared_ptr<ResourceInformation> resourceInfo = std::make_shared<ResourceInformation>(*resource);
+
+    getaddSubscriptionForRemoteService(resourceId, resourceInfo);
+    EXPECT_TRUE(getRemoveSubscriptionForRemoteService(resourceId));
 }
 
 // TEST_F(SomeipHandlerClientTests, OnSubscriptionStatus_SubscribedStatus_PostsMessageToQueue) {
