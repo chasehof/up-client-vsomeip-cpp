@@ -109,6 +109,21 @@ protected:
     void TearDown() override {
         handlerClient->quit();
     }
+
+    /**
+     *  @brief Getters for private methods in SomeipHandler.
+     */
+    bool getDoesInboundSubscriptionExist(eventgroup_t const eventGroup) {
+        return handlerClient->doesInboundSubscriptionExist(eventGroup);
+    }
+
+    void gethandleOfferUResource(std::shared_ptr<UUri> const uriPtr) {
+        handlerClient->handleOfferUResource(uriPtr);
+    }
+
+    void gethandleInboundSubscription(std::shared_ptr<subscriptionStatus> const subStatus) {
+        handlerClient->handleInboundSubscription(subStatus);
+    }
 };
 
 /**
@@ -191,6 +206,51 @@ TEST_F(SomeipHandlerClientTests, onSubscriptionNotSubscribedTest) {
 
     bool result = handlerClient->onSubscription(client, &secClient, str, isSubscribed);
     EXPECT_TRUE(result);
+}
+
+/**
+ * @brief Ensure doesInboundSubscriptionExist returns true only when inbound subscription exists.
+ */
+TEST_F(SomeipHandlerClientTests, doesInboundSubscriptionExistTest) {
+    eventgroup_t eventGroup = 0x0102;
+
+    /**
+     *  @brief Assets needed to make a UResource object.
+     */
+    uint16_t const g_uResourceIdForHandler           = 0x0102; //Method ID
+    std::string const g_uResourceNameForHandler      = "rpc";
+    std::string const g_uResourceInstanceForHandler  = "0x0102";
+    std::unique_ptr<UResource> uResource = std::make_unique<UResource>();
+    /**
+     *  @brief Set parameters of UResource object.
+     */
+    uResource->set_id(g_uResourceIdForHandler);
+    uResource->set_name(g_uResourceNameForHandler.c_str());
+    uResource->set_instance(g_uResourceInstanceForHandler);
+
+    /**
+     *  @brief SubscriptionStatus object. Used to add to the subscriber count using handleInboundSubscription.
+     */
+    subscriptionStatus subStatus;
+    subStatus.isSubscribed = true;
+    subStatus.eventgroup = eventGroup;
+    std::shared_ptr<subscriptionStatus> subStatusPtr = std::make_shared<subscriptionStatus>(subStatus);
+
+    /**
+     *  @brief Create a copy of UResource object.
+     */
+    g_testUURI->unsafe_arena_set_allocated_resource(uResource.release());
+    EXPECT_FALSE(getDoesInboundSubscriptionExist(eventGroup));
+
+    /**
+     *  @brief Add the resourceId and resource to the offeredResources_ map.
+     */
+    gethandleOfferUResource(g_testUURI);
+    /**
+     *  @brief Find resourceId in map and add to subscriber count.
+     */
+    gethandleInboundSubscription(subStatusPtr);
+    EXPECT_TRUE(getDoesInboundSubscriptionExist(eventGroup));
 }
 
 // TEST_F(SomeipHandlerClientTests, OnSubscriptionStatus_SubscribedStatus_PostsMessageToQueue) {
