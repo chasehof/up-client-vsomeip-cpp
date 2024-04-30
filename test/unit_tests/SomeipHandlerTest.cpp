@@ -12,6 +12,7 @@
 #include <up-core-api/uri.pb.h>
 #include <up-cpp/uuid/factory/Uuidv8Factory.h>
 #include "mock/UURIHelper.hpp"
+#include "vsomeip/vsomeip.hpp"
 
 using ::testing::Return;
 using namespace uprotocol::utransport;
@@ -21,37 +22,24 @@ using ::testing::NiceMock;
 using namespace up::vsomeip_client;
 
 /**
- *  @brief UUri for testing.
- */
-auto const g_testUURI = buildUURI();
-
-/**
  *  @brief Create a UResource object.
  */
-std::unique_ptr<UResource> createUResource() {
-    uint16_t const uResourceId = 0x0102; //Method ID
-    std::string const uResourceName = "rpc";
-    std::string const uResourceInstance = "0x0102";
-
-    std::unique_ptr<UResource> uResource = std::make_unique<UResource>();
-    uResource->set_id(uResourceId);
-    uResource->set_name(uResourceName.c_str());
-    uResource->set_instance(uResourceInstance);
-
-    return uResource;
-}
+std::unique_ptr<UResource> createUResource();
 
 /**
  *  @brief Build a UAttributes object.
  */
-UAttributes createUAttributes() {
-    auto uuid = Uuidv8Factory::create();
-    auto const uPriority = UPriority::UPRIORITY_CS4;
-    auto const uPublishType = UMessageType::UMESSAGE_TYPE_PUBLISH;
-    UAttributesBuilder uAttributesBuilder(*g_testUURI, uuid, uPublishType, uPriority);
+UAttributes createUAttributes();
 
-    return uAttributesBuilder.build();
-}
+/**
+ *  @brief Create a UUri object for testing.
+ */
+auto const g_testUURI = buildUURI();
+
+/**
+ *  @brief Create a message object for testing.
+ */
+std::shared_ptr<vsomeip::message> createMessage();
 
 /**
  *  @brief payload for message.
@@ -147,12 +135,11 @@ protected:
     }
 
     void getActOnBehalfOfSubscriptionAck(eventgroup_t const eventGroup) {
+        handlerClient->running_ = true;
         handlerClient->actOnBehalfOfSubscriptionAck(eventGroup);
     }
 
     size_t getQueueSize() {
-        handlerClient->running_ = true;
-
         return handlerClient->queue_[0].size();
     }
 
@@ -170,7 +157,59 @@ protected:
         return handlerClient->subscriptionsForRemoteServices_.find(resourceid) ==
             handlerClient->subscriptionsForRemoteServices_.end();
     }
+
+    bool getdoesSubscriptionForRemoteServiceExist(eventgroup_t eventGroup) {
+        return handlerClient->doesSubscriptionForRemoteServiceExist(eventGroup);
+    }
+
+    void getHandleOutboundResponse(std::shared_ptr<UMessage> const message) {
+        handlerClient->handleOutboundResponse(message);
+    }
+
+    void getHandleInboundRequest(std::shared_ptr<message> message) {
+        handlerClient->handleInboundRequest(message);
+    }
 };
+
+std::unique_ptr<UResource> createUResource() {
+    uint16_t const uResourceId = 0x0102; //Method ID
+    std::string const uResourceName = "rpc";
+    std::string const uResourceInstance = "0x0102";
+
+    std::unique_ptr<UResource> uResource = std::make_unique<UResource>();
+    uResource->set_id(uResourceId);
+    uResource->set_name(uResourceName.c_str());
+    uResource->set_instance(uResourceInstance);
+
+    return uResource;
+}
+
+UAttributes createUAttributes() {
+    auto uuid = Uuidv8Factory::create();
+    auto const uPriority = UPriority::UPRIORITY_CS4;
+    auto const uPublishType = UMessageType::UMESSAGE_TYPE_PUBLISH;
+    UAttributesBuilder uAttributesBuilder(*g_testUURI, uuid, uPublishType, uPriority);
+
+    return uAttributesBuilder.build();
+}
+
+std::shared_ptr<vsomeip::message>  createMessage() {
+    std::shared_ptr<vsomeip::message> message;
+    message = vsomeip::runtime::get()->create_request();
+    message->set_service(g_service);
+    message->set_instance(g_instance);
+    message->set_method(0x0102);
+ 
+    std::shared_ptr< vsomeip::payload > payload = vsomeip::runtime::get()->create_payload();
+    std::vector< vsomeip::byte_t > payloadData;
+    for (vsomeip::byte_t i = 0; i < 10; i++) {
+        payloadData.push_back(i % 256);
+    }
+    payload->set_data(payloadData);
+    message->set_payload(payload);
+
+    return message;
+}
 
 /**
  *  @brief Test to ensure the SomeipHandler constructor executes properly for client handlers.
@@ -259,7 +298,7 @@ TEST_F(SomeipHandlerClientTests, onSubscriptionNotSubscribedTest) {
  */
 TEST_F(SomeipHandlerClientTests, doesInboundSubscriptionExistTest) {
     eventgroup_t eventGroup = 0x0102;
-    std::unique_ptr<UResource> uResource = createUResource();
+    //std::unique_ptr<UResource> uResource = createUResource();
 
     /**
      *  @brief SubscriptionStatus object. Used to add to the subscriber count using handleInboundSubscription.
@@ -272,7 +311,7 @@ TEST_F(SomeipHandlerClientTests, doesInboundSubscriptionExistTest) {
     /**
      *  @brief Create a copy of UResource object.
      */
-    g_testUURI->unsafe_arena_set_allocated_resource(uResource.release());
+    //g_testUURI->unsafe_arena_set_allocated_resource(uResource.release());
     EXPECT_FALSE(getDoesInboundSubscriptionExist(eventGroup));
 
     /**
@@ -317,8 +356,72 @@ TEST_F(SomeipHandlerClientTests, removeSubscriptionForRemoteServiceTest) {
     std::unique_ptr<UResource> resource = createUResource();
     std::shared_ptr<ResourceInformation> resourceInfo = std::make_shared<ResourceInformation>(*resource);
 
-    getaddSubscriptionForRemoteService(resourceId, resourceInfo);
+    std::ignore = getaddSubscriptionForRemoteService(resourceId, resourceInfo);
     EXPECT_TRUE(getRemoveSubscriptionForRemoteService(resourceId));
+}
+
+/**
+ *  @brief Verify that doesSubscriptionForRemoteServiceExist correctly returns if a remote subscription exists.
+ */
+TEST_F(SomeipHandlerClientTests, doesSubscriptionForRemoteServiceExistTest) {
+    eventgroup_t eventGroup = 0x0123;
+    UResourceId_t resourceId = 0x0123;
+    std::unique_ptr<UResource> resource = createUResource();
+    std::shared_ptr<ResourceInformation> resourceInfo = std::make_shared<ResourceInformation>(*resource);
+
+    EXPECT_FALSE(getdoesSubscriptionForRemoteServiceExist(eventGroup));
+    std::ignore = getaddSubscriptionForRemoteService(resourceId, resourceInfo);
+
+    EXPECT_TRUE(getdoesSubscriptionForRemoteServiceExist(eventGroup));
+    
+}
+
+/**
+ *  @brief Check that SomeipHandler calls SomeipInterface.registerMessageHandler.
+ */
+TEST_F(SomeipHandlerClientTests, registerMessageHandlerTest) {
+    EXPECT_CALL(mockSomeipInterface, registerMessageHandler(::testing::_,
+                                                            ::testing::_,
+                                                            ::testing::_,
+                                                            ::testing::_)).Times(1);
+    handlerClient = std::make_unique<SomeipHandler>(mockSomeipInterface,
+                                                mockRouterInterface,
+                                                HandlerType::Client,
+                                                uEntity,
+                                                uAuthority,
+                                                g_instance,
+                                                2U);
+}
+
+/**
+ *  @brief Verify that a UResource is offered when handleOfferUResource is called.
+ */
+TEST_F(SomeipHandlerClientTests, handleOfferUResourceTest) {
+    eventgroup_t eventGroup = 0x0102;
+
+    /**
+     *  @brief SubscriptionStatus object. Used to add to the subscriber count using handleInboundSubscription.
+     */
+    subscriptionStatus subStatus;
+    subStatus.isSubscribed = true;
+    subStatus.eventgroup = eventGroup;
+    std::shared_ptr<subscriptionStatus> subStatusPtr = std::make_shared<subscriptionStatus>(subStatus);
+
+    EXPECT_FALSE(getDoesInboundSubscriptionExist(eventGroup));
+    gethandleOfferUResource(g_testUURI);
+    gethandleInboundSubscription(subStatusPtr);
+
+    EXPECT_TRUE(getDoesInboundSubscriptionExist(eventGroup));
+}
+
+TEST_F(SomeipHandlerClientTests, handleOutboundResponseTest) {
+    std::shared_ptr<uprotocol::utransport::UMessage> messageHandlerPtr =
+        std::make_shared<uprotocol::utransport::UMessage>(g_messageHandler);
+    std::shared_ptr<vsomeip::message> message = createMessage();
+    gethandleOfferUResource(g_testUURI);
+    //getHandleInboundRequest(message);
+    
+    getHandleOutboundResponse(messageHandlerPtr);
 }
 
 // TEST_F(SomeipHandlerClientTests, OnSubscriptionStatus_SubscribedStatus_PostsMessageToQueue) {
