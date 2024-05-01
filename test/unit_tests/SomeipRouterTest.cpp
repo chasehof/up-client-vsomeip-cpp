@@ -19,14 +19,12 @@ using namespace uprotocol::uuid;
 using namespace uprotocol::v1;
 using ::testing::NiceMock;
 
-class MockUListener : public UListener
-{
-    UStatus onReceive(UMessage &message) const {
-        std::ignore = message;
-        UStatus status;
-        status.set_code(UCode::OK);
-        return status;
-    }
+/**
+ *  @brief Mock UListener class.
+ */
+class MockUListener : public UListener {
+public:
+    MOCK_METHOD(uprotocol::v1::UStatus, onReceive, (uprotocol::utransport::UMessage &message), (const, override));
 };
 
 /**
@@ -81,10 +79,33 @@ UMessage buildUMessage(UMessageType type, UPriority priority) {
     return umsg;
 }
 
-// /**
-//  *  @brief Verify init() successfully initializes a SomeipRouter object.
-//  */
-// TEST_F(SomeipRouterTests, TestInit) {
-//   
-//     EXPECT_TRUE(router->init());
-// }
+/**
+ *  @brief Verify routeInboundSubscription() returns true.
+ */
+TEST_F(SomeipRouterTests, TestRouteInboundSubscription) {
+    // Arrange
+    std::string strTopic = "test_topic";
+    bool isSubscribe = true;
+
+    // Act
+    bool result = router->routeInboundSubscription(strTopic, isSubscribe);
+
+    // Assert
+    EXPECT_TRUE(result);
+}
+
+/**
+
+*  @brief Verify init() successfully initializes a SomeipRouter object.
+
+*/
+
+TEST_F(SomeipRouterTests, routeInboundMsgTest) {
+
+    uprotocol::utransport::UMessage umsg;
+
+    EXPECT_CALL(mockListener,  onReceive(::testing::_)).Times(1);
+
+    EXPECT_TRUE(router->routeInboundMsg(umsg));
+
+}
