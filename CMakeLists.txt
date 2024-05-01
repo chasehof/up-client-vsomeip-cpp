@@ -82,9 +82,11 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     ${VSOMEIP_LIB})
 
 if(BUILD_TESTING)
-    enable_testing()
-    add_subdirectory(test)
-    set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "")
+add_definitions(-DBUILD_TESTING)
+enable_testing()
+add_subdirectory(test)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "")
+set(BUILD_TESTING ON)
 endif()
 
 INSTALL(TARGETS ${PROJECT_NAME})

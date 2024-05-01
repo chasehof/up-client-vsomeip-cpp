@@ -72,7 +72,12 @@ bool SomeipWrapper::init() {
  */
 void SomeipWrapper::start() {
     LogTrace("{}", __FUNCTION__);
-    someipEventLoopThread_ = std::move(std::thread(std::bind(SomeipWrapper::eventLoopFn, this)));
+    if (!someipEventLoopThread_.joinable()) {
+        someipEventLoopThread_ = std::move(std::thread(std::bind(SomeipWrapper::eventLoopFn, this)));
+    } 
+    else {
+        LogErr("{}: Thread is already running", __FUNCTION__);
+    }
 }
 
 /**
@@ -80,11 +85,13 @@ void SomeipWrapper::start() {
  */
 void SomeipWrapper::stop() {
     LogTrace("{}", __FUNCTION__);
-    app_->stop();
-    LogTrace("{} Before someip event loop join", __FUNCTION__);
-    someipEventLoopThread_.join();
-    LogTrace("{} After someip event loop join", __FUNCTION__);
-    app_ = nullptr;
+    if (app_ != nullptr && someipEventLoopThread_.joinable()) {
+        app_->stop();
+        LogTrace("{} Before someip event loop join", __FUNCTION__);
+        someipEventLoopThread_.join();
+        app_ = nullptr;
+        LogTrace("{} After someip event loop join", __FUNCTION__);
+    }
 }
 
 /**
@@ -253,7 +260,13 @@ std::shared_ptr<message> SomeipWrapper::createRequest() {
  */
 std::shared_ptr<message> SomeipWrapper::createResponse(
         const std::shared_ptr<message> &request) {
-    return vsomeip::runtime::get()->create_response(request);
+    if (!request) {
+        LogErr("{}: request is null", __FUNCTION__);
+        return nullptr;
+    } 
+    else {
+        return vsomeip::runtime::get()->create_response(request);
+    }
 }
 
 /**
@@ -324,7 +337,11 @@ bool SomeipWrapper::isAvailable(
  * @param message
  */
 void SomeipWrapper::send(std::shared_ptr<message> message) {
-    app_->send(message);
+    if (!message) {
+        LogErr("{} message is empty", __FUNCTION__);
+    } else {
+        app_->send(message);
+    }
 }
 
 /**
