@@ -30,12 +30,18 @@
 #include "SomeipRouterInterface.hpp"
 #include <unordered_map>
 
+class SomeipRouterTests;
+
 /**
  * @brief Implements the SomeipRouter functionality.
  *
  * @note It provides the necessary methods to handle SomeIP routing operations.
  */
+
 class SomeipRouter : public SomeipRouterInterface{
+#ifdef BUILD_TESTING
+    friend class SomeipRouterTests;
+#endif //BUILD_TESTING
 public:
         /**
      * @brief Constructs a SomeipRouter object with a UStreamer reference.

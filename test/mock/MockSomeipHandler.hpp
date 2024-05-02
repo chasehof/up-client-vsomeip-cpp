@@ -4,8 +4,27 @@
 #include "Logger.hpp"
 #include "SomeipHandler.hpp"
  
-class MockSomeipHandler {
+class MockSomeipHandler : public SomeipHandler {
 public:
+
+    MockSomeipHandler(
+        SomeipInterface &someIpLibInterface,
+        SomeipRouterInterface &someIpRouterLibInterface,
+        HandlerType const someIpRouterHandlerType,
+        UEntity const &uEntityInfo,
+        UAuthority const &uAuthorityInfo,
+        instance_t const instanceIdentifier,
+        uint16_t qPriorityLevels
+    ) : SomeipHandler(
+            someIpLibInterface,
+            someIpRouterLibInterface,
+            someIpRouterHandlerType,
+            uEntityInfo,
+            uAuthorityInfo,
+            instanceIdentifier,
+            qPriorityLevels
+        ) {}
+
     MOCK_METHOD(bool, addThread, ());
  
     MOCK_METHOD(void, removeThread, ());

@@ -19,6 +19,7 @@ using namespace uprotocol::uuid;
 using namespace uprotocol::v1;
 using ::testing::NiceMock;
 using namespace up::vsomeip_client;
+using ::testing::_;
 
 /**
  *  @brief Create a UResource object.
@@ -181,6 +182,10 @@ protected:
     void addToUuidToSomeipRequestLookup(std::string strUUID, std::shared_ptr<message> sMsg) {
         handlerClient->uuidToSomeipRequestLookup_.insert({strUUID, sMsg});
     }
+
+    void getHandleSubscriptionRequestForRemoteService(std::shared_ptr<uprotocol::utransport::UMessage> const uMsg) {
+        handlerClient->handleSubscriptionRequestForRemoteService(uMsg);
+    }
 };
 
 std::unique_ptr<UResource> createUResource() {
@@ -237,11 +242,11 @@ TEST(SomeipHandlerStandaloneTests, SomeipHandlerClientConstructorTest) {
     ON_CALL(mockRouterInterface, isStateRegistered()).WillByDefault(Return(true));
     EXPECT_CALL(mockSomeipInterface, registerAvailabilityHandler(0,
                                                                  0,
-                                                                 ::testing::_,
-                                                                 ::testing::_,
-                                                                 ::testing::_)).Times(1);
-    EXPECT_CALL(mockSomeipInterface, requestService(0, 0, ::testing::_, ::testing::_)).Times(1);
-    EXPECT_CALL(mockSomeipInterface, offerService(0, 0, ::testing::_, ::testing::_)).Times(0);
+                                                                 _,
+                                                                 _,
+                                                                 _)).Times(1);
+    EXPECT_CALL(mockSomeipInterface, requestService(0, 0, _, _)).Times(1);
+    EXPECT_CALL(mockSomeipInterface, offerService(0, 0, _, _)).Times(0);
 
     handlerClient = std::make_unique<SomeipHandler>(mockSomeipInterface,
                                                     mockRouterInterface,
@@ -264,11 +269,11 @@ TEST(SomeipHandlerStandaloneTests, SomeipHandlerServerConstructorTest) {
 
     EXPECT_CALL(mockSomeipInterface, registerAvailabilityHandler(0,
                                                                  0,
-                                                                 ::testing::_,
-                                                                 ::testing::_,
-                                                                 ::testing::_)).Times(0);
-    EXPECT_CALL(mockSomeipInterface, requestService(0, 0, ::testing::_, ::testing::_)).Times(0);
-    EXPECT_CALL(mockSomeipInterface, offerService(0, 0, ::testing::_, ::testing::_)).Times(1);
+                                                                 _,
+                                                                 _,
+                                                                 _)).Times(0);
+    EXPECT_CALL(mockSomeipInterface, requestService(0, 0, _, _)).Times(0);
+    EXPECT_CALL(mockSomeipInterface, offerService(0, 0, _, _)).Times(1);
 
     handlerServer = std::make_unique<SomeipHandler>(mockSomeipInterface,
                                                     mockRouterInterface,
@@ -446,10 +451,10 @@ TEST_F(SomeipHandlerClientTests, doesSubscriptionForRemoteServiceExistTest) {
  *  @brief Check that SomeipHandler calls SomeipInterface.registerMessageHandler.
  */
 TEST_F(SomeipHandlerClientTests, registerMessageHandlerTest) {
-    EXPECT_CALL(mockSomeipInterface, registerMessageHandler(::testing::_,
-                                                            ::testing::_,
-                                                            ::testing::_,
-                                                            ::testing::_)).Times(1);
+    EXPECT_CALL(mockSomeipInterface, registerMessageHandler(_,
+                                                            _,
+                                                            _,
+                                                            _)).Times(1);
     handlerClient = std::make_unique<SomeipHandler>(mockSomeipInterface,
                                                 mockRouterInterface,
                                                 HandlerType::Client,
@@ -491,11 +496,11 @@ TEST_F(SomeipHandlerClientTests, handleOutboundResponseTest) {
     UMessage const &uMsg = *messageHandlerPtr;
     std::string strUUID = uprotocol::uuid::UuidSerializer::serializeToString(uMsg.attributes().reqid());
 
-    EXPECT_CALL(mockSomeipInterface, send(::testing::_)).Times(0);
+    EXPECT_CALL(mockSomeipInterface, send(_)).Times(0);
 
     getHandleOutboundResponse(messageHandlerPtr);
     addToUuidToSomeipRequestLookup(strUUID, message);
-    EXPECT_CALL(mockSomeipInterface, send(::testing::_)).Times(1);
+    EXPECT_CALL(mockSomeipInterface, send(_)).Times(1);
 
     getHandleOutboundResponse(messageHandlerPtr);
 }
@@ -529,7 +534,7 @@ TEST_F(SomeipHandlerClientTests, HandleOutboundMsgUnknownTypeTest) {
 }
 
 /**
- * @brief Unit test to verify the behavior of postMessageToQueuee when the handler is running and the priority is invalid
+ *  @brief Unit test to verify the behavior of postMessageToQueuee when the handler is running and the priority is invalid
  */
 TEST_F(SomeipHandlerClientTests, TestpostMessageToQueueeWhenRunningAndPriorityInvalid) {
     unsigned long data = 123;
@@ -538,4 +543,46 @@ TEST_F(SomeipHandlerClientTests, TestpostMessageToQueueeWhenRunningAndPriorityIn
 
     bool result = handlerClient->postMessageToQueue(HandlerMsgType::Outbound, data, ptr, priority);
     EXPECT_FALSE(result);
+}
+
+/**
+ *  @brief Verify that handleSubscriptionRequestForRemoteService only acts on ResourceInformation objects when
+ *  the router is in a registered state.
+ */
+TEST_F(SomeipHandlerClientTests, handleSubscriptionRequestForRemoteServiceRegisteredTest) {
+    std::shared_ptr<uprotocol::utransport::UMessage> messageHandlerPtr =
+        std::make_shared<uprotocol::utransport::UMessage>(g_messageHandler);
+
+    EXPECT_CALL(mockRouterInterface, isStateRegistered()).WillOnce(Return(false));
+    EXPECT_CALL(mockSomeipInterface, requestEvent(_, _, _, _, _, _)).Times(0);
+    EXPECT_CALL(mockSomeipInterface, subscribe(_, _, _, _, _)).Times(0);
+
+    getHandleSubscriptionRequestForRemoteService(messageHandlerPtr);
+    EXPECT_CALL(mockRouterInterface, isStateRegistered()).WillOnce(Return(true));
+    EXPECT_CALL(mockSomeipInterface, requestEvent(_, _, _, _, _, _)).Times(1);
+    EXPECT_CALL(mockSomeipInterface, subscribe(_, _, _, _, _)).Times(1);
+
+    getHandleSubscriptionRequestForRemoteService(messageHandlerPtr);
+}
+
+/**
+ *  @brief Verify that nothign is done in HandleSubscriptionRequestForRemoteService if the subscription already exists.
+ */
+TEST_F(SomeipHandlerClientTests, handleSubscriptionRequestForRemoteServiceSubExistsTest) {
+    UResourceId_t resourceId = 0x0123;
+    std::unique_ptr<UResource> resource = createUResource();
+    std::shared_ptr<ResourceInformation> resourceInfo = std::make_shared<ResourceInformation>(*resource);
+    std::shared_ptr<uprotocol::utransport::UMessage> messageHandlerPtr =
+        std::make_shared<uprotocol::utransport::UMessage>(g_messageHandler);
+    
+    EXPECT_CALL(mockSomeipInterface, requestEvent(_, _, _, _, _, _)).Times(1);
+    EXPECT_CALL(mockSomeipInterface, subscribe(_, _, _, _, _)).Times(1);
+    EXPECT_CALL(mockRouterInterface, isStateRegistered()).WillOnce(Return(true));
+    getHandleSubscriptionRequestForRemoteService(messageHandlerPtr);
+
+    std::ignore = getaddSubscriptionForRemoteService(resourceId, resourceInfo);
+    EXPECT_CALL(mockRouterInterface, isStateRegistered()).WillOnce(Return(true));
+    getHandleSubscriptionRequestForRemoteService(messageHandlerPtr);
+    EXPECT_CALL(mockSomeipInterface, requestEvent(_, _, _, _, _, _)).Times(0);
+    EXPECT_CALL(mockSomeipInterface, subscribe(_, _, _, _, _)).Times(0);
 }
