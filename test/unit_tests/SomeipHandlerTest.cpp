@@ -99,8 +99,8 @@ protected:
     UEntity uEntity;
     UAuthority uAuthority;
 
-    std::unique_ptr<SomeipHandler::QItem> createQItem(HandlerMsgType type, unsigned long messageData, std::shared_ptr<void> messagePtr) {
-        return std::make_unique<SomeipHandler::QItem>(type, messageData, messagePtr);
+    std::unique_ptr<SomeipHandler::QItem> createQItem(HandlerMsgType type, unsigned long messageData, std::shared_ptr<void> uMsgPtr) {
+        return std::make_unique<SomeipHandler::QItem>(type, messageData, uMsgPtr);
     }
 
     /**
@@ -192,6 +192,18 @@ protected:
     void getProcessMessage(std::unique_ptr<SomeipHandler::QItem>& item) {
         handlerClient->processMessage(std::move(item));
     }
+
+    void getHandleInboundSubscriptionAck(std::shared_ptr<subscriptionStatus> const subStatus) {
+        handlerClient->handleInboundSubscriptionAck(subStatus);
+    }
+
+    void getHandleInboundResponse(std::shared_ptr<message> msg) {
+        handlerClient->handleInboundResponse(msg);
+    }
+
+    void addToSomeipReqIdToUTransportRequestLookup(request_t requestId, std::shared_ptr<UMessage> uMsgPtr) {
+        handlerClient->someipReqIdToUTransportRequestLookup_.insert({requestId, uMsgPtr});
+    }
 };
 
 std::unique_ptr<UResource> createUResource() {
@@ -223,6 +235,8 @@ std::shared_ptr<vsomeip::message>  createMessage() {
     message->set_service(g_service);
     message->set_instance(g_instance);
     message->set_method(0x0102);
+    message->set_client(0x0123);
+    message->set_session(0x0456);
  
     std::shared_ptr< vsomeip::payload > payload = vsomeip::runtime::get()->create_payload();
     std::vector< vsomeip::byte_t > payloadData;
@@ -496,19 +510,19 @@ TEST_F(SomeipHandlerClientTests, handleOfferUResourceTest) {
  *  @brief Test that the handleOutboundResponse method only calls SomeipInterface.send if the UUID exists in the map.
  */
 TEST_F(SomeipHandlerClientTests, handleOutboundResponseTest) {
-    std::shared_ptr<uprotocol::utransport::UMessage> messagePtr =
+    std::shared_ptr<uprotocol::utransport::UMessage> uMsgPtr =
         std::make_shared<uprotocol::utransport::UMessage>(g_messageHandler);
     std::shared_ptr<vsomeip::message> message = createMessage();
-    UMessage const &uMsg = *messagePtr;
+    UMessage const &uMsg = *uMsgPtr;
     std::string strUUID = uprotocol::uuid::UuidSerializer::serializeToString(uMsg.attributes().reqid());
 
     EXPECT_CALL(mockSomeipInterface, send(_)).Times(0);
 
-    getHandleOutboundResponse(messagePtr);
+    getHandleOutboundResponse(uMsgPtr);
     addToUuidToSomeipRequestLookup(strUUID, message);
     EXPECT_CALL(mockSomeipInterface, send(_)).Times(1);
 
-    getHandleOutboundResponse(messagePtr);
+    getHandleOutboundResponse(uMsgPtr);
 }
 
 /**
@@ -556,18 +570,18 @@ TEST_F(SomeipHandlerClientTests, TestpostMessageToQueueeWhenRunningAndPriorityIn
  *  the router is in a registered state.
  */
 TEST_F(SomeipHandlerClientTests, handleSubscriptionRequestForRemoteServiceRegisteredTest) {
-    std::shared_ptr<uprotocol::utransport::UMessage> messagePtr =
+    std::shared_ptr<uprotocol::utransport::UMessage> uMsgPtr =
         std::make_shared<uprotocol::utransport::UMessage>(g_messageHandler);
 
     EXPECT_CALL(mockRouterInterface, isStateRegistered()).WillOnce(Return(false));
     EXPECT_CALL(mockSomeipInterface, requestEvent(_, _, _, _, _, _)).Times(0);
     EXPECT_CALL(mockSomeipInterface, subscribe(_, _, _, _, _)).Times(0);
-    getHandleSubscriptionRequestForRemoteService(messagePtr);
+    getHandleSubscriptionRequestForRemoteService(uMsgPtr);
 
     EXPECT_CALL(mockRouterInterface, isStateRegistered()).WillOnce(Return(true));
     EXPECT_CALL(mockSomeipInterface, requestEvent(_, _, _, _, _, _)).Times(1);
     EXPECT_CALL(mockSomeipInterface, subscribe(_, _, _, _, _)).Times(1);
-    getHandleSubscriptionRequestForRemoteService(messagePtr);
+    getHandleSubscriptionRequestForRemoteService(uMsgPtr);
 }
 
 /**
@@ -577,19 +591,19 @@ TEST_F(SomeipHandlerClientTests, handleSubscriptionRequestForRemoteServiceSubExi
     UResourceId_t resourceId = 0x0123;
     std::unique_ptr<UResource> resource = createUResource();
     std::shared_ptr<ResourceInformation> resourceInfo = std::make_shared<ResourceInformation>(*resource);
-    std::shared_ptr<uprotocol::utransport::UMessage> messagePtr =
+    std::shared_ptr<uprotocol::utransport::UMessage> uMsgPtr =
         std::make_shared<uprotocol::utransport::UMessage>(g_messageHandler);
     
     EXPECT_CALL(mockSomeipInterface, requestEvent(_, _, _, _, _, _)).Times(1);
     EXPECT_CALL(mockSomeipInterface, subscribe(_, _, _, _, _)).Times(1);
     EXPECT_CALL(mockRouterInterface, isStateRegistered()).WillOnce(Return(true));
-    getHandleSubscriptionRequestForRemoteService(messagePtr);
+    getHandleSubscriptionRequestForRemoteService(uMsgPtr);
 
     std::ignore = getaddSubscriptionForRemoteService(resourceId, resourceInfo);
     EXPECT_CALL(mockRouterInterface, isStateRegistered()).WillOnce(Return(true));
     EXPECT_CALL(mockSomeipInterface, requestEvent(_, _, _, _, _, _)).Times(0);
     EXPECT_CALL(mockSomeipInterface, subscribe(_, _, _, _, _)).Times(0);
-    getHandleSubscriptionRequestForRemoteService(messagePtr);
+    getHandleSubscriptionRequestForRemoteService(uMsgPtr);
 }
 
 /**
@@ -597,18 +611,18 @@ TEST_F(SomeipHandlerClientTests, handleSubscriptionRequestForRemoteServiceSubExi
  */
 TEST_F(SomeipHandlerClientTests, handleOutboundRequestSubTest) {
     UMessage message(g_payloadForHandler, createUAttributes(UMESSAGE_TYPE_REQUEST));
-    std::shared_ptr<uprotocol::utransport::UMessage> messagePtr =
+    std::shared_ptr<uprotocol::utransport::UMessage> uMsgPtr =
         std::make_shared<uprotocol::utransport::UMessage>(message);
 
     EXPECT_CALL(mockRouterInterface, getMessageTranslator()).Times(0);
-    getHandleOutboundMsg(messagePtr);
+    getHandleOutboundMsg(uMsgPtr);
 }
 
 /**
  *  @brief Verify no notification is sent if the subscription does not exist.
  */
 TEST_F(SomeipHandlerClientTests, handleOutboundNotificationNoSubTest) {
-    std::shared_ptr<uprotocol::utransport::UMessage> messagePtr =
+    std::shared_ptr<uprotocol::utransport::UMessage> uMsgPtr =
         std::make_shared<uprotocol::utransport::UMessage>(g_messageHandler);
 
     std::shared_ptr< vsomeip::payload > payload = vsomeip::runtime::get()->create_payload();
@@ -620,7 +634,7 @@ TEST_F(SomeipHandlerClientTests, handleOutboundNotificationNoSubTest) {
 
     EXPECT_CALL(mockSomeipInterface, createPayload()).Times(1).WillOnce(testing::Return(payload));
     EXPECT_CALL(mockSomeipInterface, notify(_, _, _, _, _)).Times(0);
-    getHandleOutboundMsg(messagePtr);
+    getHandleOutboundMsg(uMsgPtr);
 }
 
 /**
@@ -628,7 +642,7 @@ TEST_F(SomeipHandlerClientTests, handleOutboundNotificationNoSubTest) {
  */
 TEST_F(SomeipHandlerClientTests, handleOutboundNotificationSubTest) {
     eventgroup_t eventGroup = 0x0102;
-    std::shared_ptr<uprotocol::utransport::UMessage> messagePtr =
+    std::shared_ptr<uprotocol::utransport::UMessage> uMsgPtr =
         std::make_shared<uprotocol::utransport::UMessage>(g_messageHandler);
 
     std::shared_ptr< vsomeip::payload > payload = vsomeip::runtime::get()->create_payload();
@@ -648,7 +662,7 @@ TEST_F(SomeipHandlerClientTests, handleOutboundNotificationSubTest) {
 
     EXPECT_CALL(mockSomeipInterface, createPayload()).Times(1).WillOnce(testing::Return(payload));
     EXPECT_CALL(mockSomeipInterface, notify(_, _, _, _, _)).Times(1);
-    getHandleOutboundMsg(messagePtr);
+    getHandleOutboundMsg(uMsgPtr);
 }
 
 /**
@@ -663,4 +677,49 @@ TEST_F(SomeipHandlerClientTests, handleInboundRequestTest) {
     EXPECT_CALL(mockRouterInterface, routeInboundMsg(_)).Times(1);
     EXPECT_CALL(mockRouterInterface, getMessageTranslator()).Times(1).WillOnce(testing::ReturnRef(translator));
     getHandleInboundRequest(message);
+}
+
+/**
+ *  @brief Verify that an inbound response is only routed if the request ID exists in the map.
+ */
+TEST_F(SomeipHandlerClientTests, handleInboundResponseTest) {
+    std::shared_ptr<vsomeip::message> message = createMessage();
+    MockSomeipInterface mockInterface;
+    MessageTranslator translator(mockInterface);
+    request_t requestId= 0x1230456;
+    std::shared_ptr<uprotocol::utransport::UMessage> uMsgPtr =
+        std::make_shared<uprotocol::utransport::UMessage>(g_messageHandler);
+
+    EXPECT_CALL(mockRouterInterface, getMessageTranslator()).Times(0);
+    getHandleInboundResponse(message);
+
+    addToSomeipReqIdToUTransportRequestLookup(requestId, uMsgPtr);
+    EXPECT_CALL(mockRouterInterface, getMessageTranslator()).Times(1).WillOnce(testing::ReturnRef(translator));
+    EXPECT_CALL(mockRouterInterface, routeInboundMsg(_)).Times(1);
+    getHandleInboundResponse(message);
+}
+
+/**
+ *  @brief Ensure an ack is only routed when an even group exists for the ack.
+ */
+TEST_F(SomeipHandlerClientTests, HandleInboundSubscriptionAckTest) {
+    eventgroup_t eventGroup = 0x0102;
+    UResourceId_t resourceId = 0x0102;
+    subscriptionStatus subStatus;
+    subStatus.isSubscribed = true;
+    subStatus.eventgroup = eventGroup;
+    std::shared_ptr<subscriptionStatus> subStatusPtr = std::make_shared<subscriptionStatus>(subStatus);
+    std::unique_ptr<UResource> resource = createUResource();
+    std::shared_ptr<ResourceInformation> resourceInfo = std::make_shared<ResourceInformation>(*resource);
+    MockSomeipInterface mockInterface;
+    MessageTranslator translator(mockInterface);
+
+    EXPECT_CALL(mockRouterInterface, getMessageTranslator()).Times(0);
+    getHandleInboundSubscriptionAck(subStatusPtr);
+    
+
+    getaddSubscriptionForRemoteService(resourceId, resourceInfo);
+    EXPECT_CALL(mockRouterInterface, getMessageTranslator()).Times(1).WillOnce(testing::ReturnRef(translator));
+    EXPECT_CALL(mockRouterInterface, routeInboundMsg(_)).Times(1);
+    getHandleInboundSubscriptionAck(subStatusPtr);
 }
