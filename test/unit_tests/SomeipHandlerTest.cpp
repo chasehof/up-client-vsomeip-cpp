@@ -55,6 +55,7 @@ UMessage g_messageHandler(g_payloadForHandler, createUAttributes());
  */
 service_t const g_service = 0x1234;
 instance_t const g_instance = 0x1111;
+eventgroup_t g_eventGroup = 0x0102;
 
 /**
  *  @brief SomeipHandler test fixture for a SomeipHandler Server type.
@@ -174,8 +175,8 @@ protected:
         handlerClient->handleInboundRequest(message);
     }
 
-    void addToUuidToSomeipRequestLookup(std::string strUUID, std::shared_ptr<message> sMsg) {
-        handlerClient->uuidToSomeipRequestLookup_.insert({strUUID, sMsg});
+    void addToUuidToSomeipRequestLookup(std::string strUUID, std::shared_ptr<message> msg) {
+        handlerClient->uuidToSomeipRequestLookup_.insert({strUUID, msg});
     }
 
     void getHandleSubscriptionRequestForRemoteService(std::shared_ptr<uprotocol::utransport::UMessage> const uMsg) {
@@ -203,6 +204,20 @@ protected:
 
     void addToSomeipReqIdToUTransportRequestLookup(request_t requestId, std::shared_ptr<UMessage> uMsgPtr) {
         handlerClient->someipReqIdToUTransportRequestLookup_.insert({requestId, uMsgPtr});
+    }
+
+    void getHandleInboundNotification(std::shared_ptr<message> msg) {
+        handlerClient->handleInboundNotification(msg);
+    }
+
+    void setIsReadable(bool isReadable) {
+        handlerClient->isServiceAvailable_.setValueAndNotify(isReadable);
+    }
+
+    bool doesRequestExist(request_t requestId) {
+        LogInfo("{} request id:**********[0x{:x}]", __FUNCTION__, requestId);
+        return handlerClient->someipReqIdToUTransportRequestLookup_.find(requestId) !=
+            handlerClient->someipReqIdToUTransportRequestLookup_.end();
     }
 };
 
@@ -375,8 +390,6 @@ TEST_F(SomeipHandlerClientTests, OnSubscriptionStatus_ExceptionCaught_LogsErrorM
  * @brief Ensure doesInboundSubscriptionExist returns true only when inbound subscription exists.
  */
 TEST_F(SomeipHandlerClientTests, doesInboundSubscriptionExistTest) {
-    eventgroup_t eventGroup = 0x0102;
-
     /**
      *  @brief Assets needed to make a UResource object.
      */
@@ -396,13 +409,13 @@ TEST_F(SomeipHandlerClientTests, doesInboundSubscriptionExistTest) {
      */
     subscriptionStatus subStatus;
     subStatus.isSubscribed = true;
-    subStatus.eventgroup = eventGroup;
+    subStatus.eventgroup = g_eventGroup;
     std::shared_ptr<subscriptionStatus> subStatusPtr = std::make_shared<subscriptionStatus>(subStatus);
 
     /**
      *  @brief Create a copy of UResource object.
      */
-    EXPECT_FALSE(getDoesInboundSubscriptionExist(eventGroup));
+    EXPECT_FALSE(getDoesInboundSubscriptionExist(g_eventGroup));
 
     /**
      *  @brief Add the resourceId and resource to the offeredResources_ map.
@@ -412,7 +425,7 @@ TEST_F(SomeipHandlerClientTests, doesInboundSubscriptionExistTest) {
      *  @brief Find resourceId in map and add to subscriber count.
      */
     gethandleInboundSubscription(subStatusPtr);
-    EXPECT_TRUE(getDoesInboundSubscriptionExist(eventGroup));
+    EXPECT_TRUE(getDoesInboundSubscriptionExist(g_eventGroup));
 }
 
 /**
@@ -420,10 +433,9 @@ TEST_F(SomeipHandlerClientTests, doesInboundSubscriptionExistTest) {
  *  actOnBehalfOfSubscriptionAck calls onSubscriptionStatus which then calls postMessageToQueue.
  */
 TEST_F(SomeipHandlerClientTests, actOnBehalfOfSubscriptionAckTest) {
-    eventgroup_t eventGroup = 0x0123;
     size_t originalSize = getQueueSize();
 
-    getActOnBehalfOfSubscriptionAck(eventGroup);
+    getActOnBehalfOfSubscriptionAck(g_eventGroup);
     EXPECT_EQ(originalSize + 1, getQueueSize());
 }
 
@@ -488,21 +500,19 @@ TEST_F(SomeipHandlerClientTests, registerMessageHandlerTest) {
  *  @brief Verify that a UResource is offered when handleOfferUResource is called.
  */
 TEST_F(SomeipHandlerClientTests, handleOfferUResourceTest) {
-    eventgroup_t eventGroup = 0x0102;
-
     /**
      *  @brief SubscriptionStatus object. Used to add to the subscriber count using handleInboundSubscription.
      */
     subscriptionStatus subStatus;
     subStatus.isSubscribed = true;
-    subStatus.eventgroup = eventGroup;
+    subStatus.eventgroup = g_eventGroup;
     std::shared_ptr<subscriptionStatus> subStatusPtr = std::make_shared<subscriptionStatus>(subStatus);
 
-    EXPECT_FALSE(getDoesInboundSubscriptionExist(eventGroup));
+    EXPECT_FALSE(getDoesInboundSubscriptionExist(g_eventGroup));
 
     gethandleOfferUResource(g_testUURI);
     gethandleInboundSubscription(subStatusPtr);
-    EXPECT_TRUE(getDoesInboundSubscriptionExist(eventGroup));
+    EXPECT_TRUE(getDoesInboundSubscriptionExist(g_eventGroup));
 }
 
 
@@ -641,7 +651,6 @@ TEST_F(SomeipHandlerClientTests, handleOutboundNotificationNoSubTest) {
  *  @brief Verify that a notification is sent when the subscription exists.
  */
 TEST_F(SomeipHandlerClientTests, handleOutboundNotificationSubTest) {
-    eventgroup_t eventGroup = 0x0102;
     std::shared_ptr<uprotocol::utransport::UMessage> uMsgPtr =
         std::make_shared<uprotocol::utransport::UMessage>(g_messageHandler);
 
@@ -654,7 +663,7 @@ TEST_F(SomeipHandlerClientTests, handleOutboundNotificationSubTest) {
 
     subscriptionStatus subStatus;
     subStatus.isSubscribed = true;
-    subStatus.eventgroup = eventGroup;
+    subStatus.eventgroup = g_eventGroup;
     std::shared_ptr<subscriptionStatus> subStatusPtr = std::make_shared<subscriptionStatus>(subStatus);
 
     gethandleOfferUResource(g_testUURI);
@@ -702,12 +711,11 @@ TEST_F(SomeipHandlerClientTests, handleInboundResponseTest) {
 /**
  *  @brief Ensure an ack is only routed when an even group exists for the ack.
  */
-TEST_F(SomeipHandlerClientTests, HandleInboundSubscriptionAckTest) {
-    eventgroup_t eventGroup = 0x0102;
+TEST_F(SomeipHandlerClientTests, handleInboundSubscriptionAckTest) {
     UResourceId_t resourceId = 0x0102;
     subscriptionStatus subStatus;
     subStatus.isSubscribed = true;
-    subStatus.eventgroup = eventGroup;
+    subStatus.eventgroup = g_eventGroup;
     std::shared_ptr<subscriptionStatus> subStatusPtr = std::make_shared<subscriptionStatus>(subStatus);
     std::unique_ptr<UResource> resource = createUResource();
     std::shared_ptr<ResourceInformation> resourceInfo = std::make_shared<ResourceInformation>(*resource);
@@ -722,4 +730,92 @@ TEST_F(SomeipHandlerClientTests, HandleInboundSubscriptionAckTest) {
     EXPECT_CALL(mockRouterInterface, getMessageTranslator()).Times(1).WillOnce(testing::ReturnRef(translator));
     EXPECT_CALL(mockRouterInterface, routeInboundMsg(_)).Times(1);
     getHandleInboundSubscriptionAck(subStatusPtr);
+}
+
+/**
+ *  @brief Ensure an inbound notification is only routed if the subscription exists in the map.
+ */
+TEST_F(SomeipHandlerClientTests, handleInboundNotificationTest) {
+    std::shared_ptr<vsomeip::message> message = createMessage();
+    UResourceId_t resourceId = 0x0102;
+    std::unique_ptr<UResource> resource = createUResource();
+    std::shared_ptr<ResourceInformation> resourceInfo = std::make_shared<ResourceInformation>(*resource);
+    MockSomeipInterface mockInterface;
+    MessageTranslator translator(mockInterface);
+
+    EXPECT_CALL(mockRouterInterface, getMessageTranslator()).Times(0).WillOnce(testing::ReturnRef(translator));
+    EXPECT_CALL(mockRouterInterface, routeInboundMsg(_)).Times(0);
+    getHandleInboundNotification(message);
+
+    getaddSubscriptionForRemoteService(resourceId, resourceInfo);
+    EXPECT_CALL(mockRouterInterface, getMessageTranslator()).Times(1).WillOnce(testing::ReturnRef(translator));
+    EXPECT_CALL(mockRouterInterface, routeInboundMsg(_)).Times(1);
+    getHandleInboundNotification(message);
+}
+
+/**
+ *  @brief Verify subscriber is not added if the resource ID does not exist in the map.
+ */
+TEST_F(SomeipHandlerClientTests, handleInboundSubscriptionUnsupportedTest) {
+    subscriptionStatus subStatus;
+    subStatus.isSubscribed = true;
+    subStatus.eventgroup = g_eventGroup;
+    std::shared_ptr<subscriptionStatus> subStatusPtr = std::make_shared<subscriptionStatus>(subStatus);
+
+    gethandleInboundSubscription(subStatusPtr);
+    EXPECT_FALSE(getDoesInboundSubscriptionExist(g_eventGroup));
+}
+
+/**
+ *  @brief Verify that an unsubscribe request is processed correctly in handleInboundSubscription.
+ */
+TEST_F(SomeipHandlerClientTests, handleInboundSubscriptionUnsubscribeTest) {
+    subscriptionStatus subStatus;
+    subStatus.isSubscribed = true;
+    subStatus.eventgroup = g_eventGroup;
+    std::shared_ptr<subscriptionStatus> subStatusPtr = std::make_shared<subscriptionStatus>(subStatus);
+
+    gethandleOfferUResource(g_testUURI);
+    gethandleInboundSubscription(subStatusPtr);
+    EXPECT_TRUE(getDoesInboundSubscriptionExist(g_eventGroup));
+
+    subStatusPtr->isSubscribed = false;
+    gethandleOfferUResource(g_testUURI);
+    gethandleInboundSubscription(subStatusPtr);
+    EXPECT_FALSE(getDoesInboundSubscriptionExist(g_eventGroup));
+}
+
+/**
+ *  @brief Verify handleOutboundRequest only sends and adds a message to the map if the service is available.
+ */
+TEST_F(SomeipHandlerClientTests, handleOutboundRequestTest) {
+    request_t requestId= 0x1230456;
+    auto const type = UMessageType::UMESSAGE_TYPE_REQUEST;
+    auto uuid = Uuidv8Factory::create();
+    UAttributesBuilder builder(*g_testUURI,uuid, type, UPriority::UPRIORITY_CS4);
+    builder.setSink(*g_testUURI);
+    UAttributes uAttributes = builder.build();
+        
+    UMessage uMessage(g_payloadForHandler, uAttributes);
+    std::shared_ptr<uprotocol::utransport::UMessage> uMsgPtr =
+        std::make_shared<uprotocol::utransport::UMessage>(uMessage);
+    MockSomeipInterface mockInterface;
+    MessageTranslator translator(mockInterface);
+
+    std::shared_ptr<vsomeip::message> message = createMessage();
+    std::shared_ptr<vsomeip::payload> payload = vsomeip::runtime::get()->create_payload();
+
+    EXPECT_CALL(mockRouterInterface, getMessageTranslator()).Times(1).WillOnce(testing::ReturnRef(translator));
+    EXPECT_CALL(mockInterface, createRequest()).Times(1).WillOnce(Return(message));
+    EXPECT_CALL(mockInterface, createPayload()).Times(1).WillOnce(Return(payload));
+    EXPECT_CALL(mockInterface, send(_)).Times(0);
+    getHandleOutboundMsg(uMsgPtr);
+    
+    setIsReadable(true);
+    EXPECT_CALL(mockRouterInterface, getMessageTranslator()).Times(1).WillOnce(testing::ReturnRef(translator));
+    EXPECT_CALL(mockInterface, createRequest()).Times(1).WillOnce(Return(message));
+    EXPECT_CALL(mockInterface, createPayload()).Times(1).WillOnce(Return(payload));
+    EXPECT_CALL(mockSomeipInterface, send(_)).Times(1);
+    getHandleOutboundMsg(uMsgPtr);
+    EXPECT_TRUE(doesRequestExist(requestId));
 }
