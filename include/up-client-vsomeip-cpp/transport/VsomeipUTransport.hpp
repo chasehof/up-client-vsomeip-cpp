@@ -44,6 +44,9 @@
 // };
 
 class VsomeipUTransport : public uprotocol::utransport::UTransport {
+#ifdef BUILD_TESTING
+friend class VsomeipUTransportTests;
+#endif //BUILD_TESTING  
 public:
 
     /**

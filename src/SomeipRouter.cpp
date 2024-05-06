@@ -40,13 +40,16 @@ using namespace uprotocol::v1;
  * @param listener @see @ref SomeipRouter::SomeipRouter()
  */
 SomeipRouter::SomeipRouter(UListener const &listener) :
-    someipInterface_(std::make_shared<SomeipWrapper>()),
+    SomeipRouter(listener, std::make_shared<SomeipWrapper>()) {
+}
+
+SomeipRouter::SomeipRouter(UListener const &listener, std::shared_ptr<SomeipInterface> someipInterface) :
+    someipInterface_(someipInterface),
     msgTranslator_(std::make_unique<MessageTranslator>(*someipInterface_)),
     listener_(listener) {
 
     LogTrace("{} SomeipRouter is initialized !!!", __FUNCTION__);
 }
-
 /**
  * @brief @see @ref void SomeipRouter::stopService().
  */

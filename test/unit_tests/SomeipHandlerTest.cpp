@@ -19,6 +19,7 @@ using namespace uprotocol::uuid;
 using namespace uprotocol::v1;
 using ::testing::NiceMock;
 using namespace up::vsomeip_client;
+using ::testing::_;
 
 /**
  *  @brief Create a UResource object.
@@ -184,6 +185,25 @@ protected:
 
     void addToUuidToSomeipRequestLookup(std::string strUUID, std::shared_ptr<message> sMsg) {
         handlerClient->uuidToSomeipRequestLookup_.insert({strUUID, sMsg});
+    }
+    void handleInboundMsg(std::shared_ptr<message> const msg){
+        handlerClient->handleInboundMsg(msg);
+    }
+    void setRunning(bool value) {
+       handlerClient->running_ = value;
+    }
+    void getQuit() {
+        handlerClient->quit();
+    }
+
+    void getHandleOutboundRequest(std::shared_ptr<UMessage> const uMsg) {
+
+        handlerClient->handleOutboundRequest(uMsg);
+
+    }
+
+    void getHandleSubscriptionRequestForRemoteService(std::shared_ptr<uprotocol::utransport::UMessage> const uMsg) {
+        handlerClient->handleSubscriptionRequestForRemoteService(uMsg);
     }
 
 };
@@ -663,3 +683,144 @@ TEST_F(SomeipHandlerClientTests, BuildSomeipPayloadFromUMessageTest) {
     EXPECT_EQ(result.size(), 4);
 }
 
+TEST_F(SomeipHandlerClientTests, handleInboundmsg) {
+    std::shared_ptr<vsomeip::message> notification;
+    notification = vsomeip::runtime::get()->create_request();
+    notification->set_service(0x1234);
+    notification->set_instance(0x1111);
+    notification->set_method(0x3456);
+    notification->set_message_type(message_type_e::MT_NOTIFICATION);
+
+    std::shared_ptr< vsomeip::payload > its_payload = vsomeip::runtime::get()->create_payload();
+    std::vector< vsomeip::byte_t > its_payload_data;
+    for (vsomeip::byte_t i=0; i<10; i++) {
+        its_payload_data.push_back(i % 256);
+    }
+    its_payload->set_data(its_payload_data);
+    notification->set_payload(its_payload);
+    
+    EXPECT_NO_THROW(handleInboundMsg(notification));
+}
+
+TEST_F(SomeipHandlerClientTests, handleInboundmsgResponse) {
+    std::shared_ptr<vsomeip::message> notification;
+    notification = vsomeip::runtime::get()->create_request();
+    notification->set_service(0x1234);
+    notification->set_instance(0x1111);
+    notification->set_method(0x3456);
+    notification->set_message_type(message_type_e::MT_RESPONSE);
+
+    std::shared_ptr< vsomeip::payload > its_payload = vsomeip::runtime::get()->create_payload();
+    std::vector< vsomeip::byte_t > its_payload_data;
+    for (vsomeip::byte_t i=0; i<10; i++) {
+        its_payload_data.push_back(i % 256);
+    }
+    its_payload->set_data(its_payload_data);
+    notification->set_payload(its_payload);
+    
+    EXPECT_NO_THROW(handleInboundMsg(notification));
+}
+
+// Test case for queueOfferUResource when handler is not running
+TEST_F(SomeipHandlerClientTests, QueueOfferUResource_RunningHandler) {
+  
+    std::shared_ptr<UUri> uriPtr = g_testUURI;
+
+    setRunning(true);
+    handlerClient->queueOfferUResource(uriPtr);
+}
+
+// Test case for queueOfferUResource when handler is not running
+TEST_F(SomeipHandlerClientTests, onMessage) {
+    std::shared_ptr<vsomeip::message> notification;
+    notification = vsomeip::runtime::get()->create_request();
+    notification->set_service(0x1234);
+    notification->set_instance(0x1111);
+    notification->set_method(0x3456);
+    notification->set_message_type(message_type_e::MT_RESPONSE);
+
+    std::shared_ptr< vsomeip::payload > its_payload = vsomeip::runtime::get()->create_payload();
+    std::vector< vsomeip::byte_t > its_payload_data;
+    for (vsomeip::byte_t i=0; i<10; i++) {
+        its_payload_data.push_back(i % 256);
+    }
+    its_payload->set_data(its_payload_data);
+    notification->set_payload(its_payload);
+
+    setRunning(true);
+    handlerClient->onMessage(notification);
+}
+TEST_F(SomeipHandlerClientTests, quitTest){
+    setRunning(true);
+    EXPECT_NO_THROW(getQuit());
+}
+
+/**
+
+*  @brief Verify that handleSubscriptionRequestForRemoteService only acts on ResourceInformation objects when
+
+*  the router is in a registered state.
+
+*/
+
+TEST_F(SomeipHandlerClientTests, handleSubscriptionRequestForRemoteServiceRegisteredTest) {
+
+    std::shared_ptr<uprotocol::utransport::UMessage> messageHandlerPtr =
+
+        std::make_shared<uprotocol::utransport::UMessage>(g_messageHandler);
+ 
+    EXPECT_CALL(mockRouterInterface, isStateRegistered()).WillOnce(Return(false));
+
+    EXPECT_CALL(mockSomeipInterface, requestEvent(_, _, _, _, _, _)).Times(0);
+
+    EXPECT_CALL(mockSomeipInterface, subscribe(_, _, _, _, _)).Times(0);
+ 
+    getHandleSubscriptionRequestForRemoteService(messageHandlerPtr);
+
+    EXPECT_CALL(mockRouterInterface, isStateRegistered()).WillOnce(Return(true));
+
+    EXPECT_CALL(mockSomeipInterface, requestEvent(_, _, _, _, _, _)).Times(1);
+
+    EXPECT_CALL(mockSomeipInterface, subscribe(_, _, _, _, _)).Times(1);
+ 
+    getHandleSubscriptionRequestForRemoteService(messageHandlerPtr);
+
+}
+ 
+/**
+
+*  @brief Verify that nothign is done in HandleSubscriptionRequestForRemoteService if the subscription already exists.
+
+*/
+
+TEST_F(SomeipHandlerClientTests, handleSubscriptionRequestForRemoteServiceSubExistsTest) {
+
+    UResourceId_t resourceId = 0x0123;
+
+    std::unique_ptr<UResource> resource = createUResource();
+
+    std::shared_ptr<ResourceInformation> resourceInfo = std::make_shared<ResourceInformation>(*resource);
+
+    std::shared_ptr<uprotocol::utransport::UMessage> messageHandlerPtr =
+
+        std::make_shared<uprotocol::utransport::UMessage>(g_messageHandler);
+
+    EXPECT_CALL(mockSomeipInterface, requestEvent(_, _, _, _, _, _)).Times(1);
+
+    EXPECT_CALL(mockSomeipInterface, subscribe(_, _, _, _, _)).Times(1);
+
+    EXPECT_CALL(mockRouterInterface, isStateRegistered()).WillOnce(Return(true));
+
+    getHandleSubscriptionRequestForRemoteService(messageHandlerPtr);
+ 
+    std::ignore = getaddSubscriptionForRemoteService(resourceId, resourceInfo);
+
+    EXPECT_CALL(mockRouterInterface, isStateRegistered()).WillOnce(Return(true));
+
+    getHandleSubscriptionRequestForRemoteService(messageHandlerPtr);
+
+    EXPECT_CALL(mockSomeipInterface, requestEvent(_, _, _, _, _, _)).Times(0);
+
+    EXPECT_CALL(mockSomeipInterface, subscribe(_, _, _, _, _)).Times(0);
+
+}
