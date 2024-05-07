@@ -600,6 +600,7 @@ TEST_F(SomeipHandlerClientTests, handleInboundmsgResponseTest) {
     
     EXPECT_NO_THROW(getHandleInboundMsg(notification));
 }
+
 /**
  *  @brief Test case for queueOfferUResource when handler is not running.
  */
@@ -742,13 +743,14 @@ TEST_F(SomeipHandlerClientTests, handleOutboundNotificationSubTest) {
  */
 TEST_F(SomeipHandlerClientTests, handleInboundRequestTest) {
     std::shared_ptr<vsomeip::message> message = createMessage();
+    message->set_message_type(message_type_e::MT_REQUEST);
     MockSomeipInterface mockInterface;
     MessageTranslator translator(mockInterface);
 
     gethandleOfferUResource(g_testUURI);
     EXPECT_CALL(mockRouterInterface, routeInboundMsg(_)).Times(1);
     EXPECT_CALL(mockRouterInterface, getMessageTranslator()).Times(1).WillOnce(testing::ReturnRef(translator));
-    getHandleInboundRequest(message);
+    getHandleInboundMsg(message);
 }
 
 /**
