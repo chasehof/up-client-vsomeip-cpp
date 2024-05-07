@@ -1,25 +1,4 @@
-#include <gtest/gtest.h>
-#include <gmock/gmock.h>
-#include <vsomeip/vsomeip.hpp>
-#include <memory>
-#include <vector>
-#include "SomeipHandler.hpp"
-#include "MessageTranslator.hpp"
-#include "mock/MockSomeipInterface.hpp"
-#include "mock/MockSomeipRouterInterface.hpp"
-#include <VsomeipUTransport.hpp>
-#include <up-cpp/transport/builder/UAttributesBuilder.h>
-#include <up-core-api/uri.pb.h>
-#include <up-cpp/uuid/factory/Uuidv8Factory.h>
-#include "mock/UURIHelper.hpp"
-
-using ::testing::Return;
-using namespace uprotocol::utransport;
-using namespace uprotocol::uuid;
-using namespace uprotocol::v1;
-using ::testing::NiceMock;
-using namespace up::vsomeip_client;
-using ::testing::_;
+#include "mock/SomeipHandlerTest.hpp"
 
 /**
  *  @brief Create a UResource object.
@@ -90,137 +69,28 @@ protected:
 };
 
 /**
- *  @brief SomeipHandler test fixture for a SomeipHandler client type.
+ *  @brief Setup for SomeipHandler. Initializes required variables.
  */
-class SomeipHandlerClientTests : public ::testing::Test {
-protected:
-    ::testing::NiceMock<MockSomeipInterface> mockSomeipInterface;
-    ::testing::NiceMock<MockSomeipRouterInterface> mockRouterInterface;
-    std::unique_ptr<SomeipHandler> handlerClient;
-    UEntity uEntity;
-    UAuthority uAuthority;
+void SomeipHandlerClientTests::SetUp() {
+    handlerClient = std::make_unique<SomeipHandler>(mockSomeipInterface,
+                                                    mockRouterInterface,
+                                                    HandlerType::Client,
+                                                    uEntity,
+                                                    uAuthority,
+                                                    g_instance,
+                                                    2U);
+}
 
-    std::unique_ptr<SomeipHandler::QItem> createQItem(HandlerMsgType type, unsigned long messageData, std::shared_ptr<void> uMsgPtr) {
-        return std::make_unique<SomeipHandler::QItem>(type, messageData, uMsgPtr);
-    }
+/**
+ *  @brief Teardown for SomeipHandler.
+ */
+void SomeipHandlerClientTests::TearDown() {
+    handlerClient->quit();
+}
 
-    /**
-     *  @brief Setup for SomeipHandler. Initializes required variables.
-     */
-    void SetUp() override {
-        handlerClient = std::make_unique<SomeipHandler>(mockSomeipInterface,
-                                                        mockRouterInterface,
-                                                        HandlerType::Client,
-                                                        uEntity,
-                                                        uAuthority,
-                                                        g_instance,
-                                                        2U);
-    }
-    
-    /**
-     *  @brief Teardown for SomeipHandler.
-     */
-    void TearDown() override {
-        handlerClient->quit();
-    }
-
-    /**
-     *  @brief Getters for private methods in SomeipHandler.
-     */
-    bool getDoesInboundSubscriptionExist(eventgroup_t const eventGroup) {
-        return handlerClient->doesInboundSubscriptionExist(eventGroup);
-    }
-
-    void gethandleOfferUResource(std::shared_ptr<UUri> const uriPtr) {
-        handlerClient->handleOfferUResource(uriPtr);
-    }
-
-    void gethandleInboundSubscription(std::shared_ptr<subscriptionStatus> const subStatus) {
-        handlerClient->handleInboundSubscription(subStatus);
-    }
-
-    void getActOnBehalfOfSubscriptionAck(eventgroup_t const eventGroup) {
-        handlerClient->running_ = true;
-        handlerClient->actOnBehalfOfSubscriptionAck(eventGroup);
-    }
-
-    size_t getQueueSize() {
-        return handlerClient->queue_[0].size();
-    }
-
-    bool getaddSubscriptionForRemoteService(UResourceId_t resourceid,
-                                            std::shared_ptr<ResourceInformation> resourceInfo) {
-        handlerClient->addSubscriptionForRemoteService(resourceid, resourceInfo);
-
-        return handlerClient->subscriptionsForRemoteServices_.find(resourceid) !=
-            handlerClient->subscriptionsForRemoteServices_.end();
-    }
-
-    bool getRemoveSubscriptionForRemoteService(UResourceId_t resourceid) {
-        handlerClient->removeSubscriptionForRemoteService(resourceid);
-
-        return handlerClient->subscriptionsForRemoteServices_.find(resourceid) ==
-            handlerClient->subscriptionsForRemoteServices_.end();
-    }
-
-    bool getdoesSubscriptionForRemoteServiceExist(eventgroup_t eventGroup) {
-        return handlerClient->doesSubscriptionForRemoteServiceExist(eventGroup);
-    }
-
-    void getHandleOutboundResponse(std::shared_ptr<UMessage> const message) {
-        handlerClient->handleOutboundResponse(message);
-    }
-
-    void getHandleInboundRequest(std::shared_ptr<message> message) {
-        handlerClient->handleInboundRequest(message);
-    }
-
-    void addToUuidToSomeipRequestLookup(std::string strUUID, std::shared_ptr<message> msg) {
-        handlerClient->uuidToSomeipRequestLookup_.insert({strUUID, msg});
-    }
-
-    void getHandleSubscriptionRequestForRemoteService(std::shared_ptr<uprotocol::utransport::UMessage> const uMsg) {
-        handlerClient->handleSubscriptionRequestForRemoteService(uMsg);
-    }
-
-    void getHandleOutboundNotification(std::shared_ptr<UMessage> const uMsgPtr) {
-        handlerClient->handleOutboundNotification(uMsgPtr);
-    }
-
-    void getHandleOutboundMsg(std::shared_ptr<UMessage> const uMsg) {
-        handlerClient->handleOutboundMsg(uMsg);
-    }
-    void getProcessMessage(std::unique_ptr<SomeipHandler::QItem>& item) {
-        handlerClient->processMessage(std::move(item));
-    }
-
-    void getHandleInboundSubscriptionAck(std::shared_ptr<subscriptionStatus> const subStatus) {
-        handlerClient->handleInboundSubscriptionAck(subStatus);
-    }
-
-    void getHandleInboundResponse(std::shared_ptr<message> msg) {
-        handlerClient->handleInboundResponse(msg);
-    }
-
-    void addToSomeipReqIdToUTransportRequestLookup(request_t requestId, std::shared_ptr<UMessage> uMsgPtr) {
-        handlerClient->someipReqIdToUTransportRequestLookup_.insert({requestId, uMsgPtr});
-    }
-
-    void getHandleInboundNotification(std::shared_ptr<message> msg) {
-        handlerClient->handleInboundNotification(msg);
-    }
-
-    void setIsReadable(bool isReadable) {
-        handlerClient->isServiceAvailable_.setValueAndNotify(isReadable);
-    }
-
-    bool doesRequestExist(request_t requestId) {
-        LogInfo("{} request id:**********[0x{:x}]", __FUNCTION__, requestId);
-        return handlerClient->someipReqIdToUTransportRequestLookup_.find(requestId) !=
-            handlerClient->someipReqIdToUTransportRequestLookup_.end();
-    }
-};
-
+/**
+ *  @brief Create a UResource object.
+ */
 std::unique_ptr<UResource> createUResource() {
     uint16_t const uResourceId = 0x0102; //Method ID
     std::string const uResourceName = "rpc";
@@ -234,6 +104,9 @@ std::unique_ptr<UResource> createUResource() {
     return uResource;
 }
 
+/**
+ *  @brief Build a UAttributes object.
+ */
 UAttributes createUAttributes(UMessageType type) {
     auto uuid = Uuidv8Factory::create();
     auto const uPriority = UPriority::UPRIORITY_CS4;
@@ -244,6 +117,9 @@ UAttributes createUAttributes(UMessageType type) {
     return uAttributesBuilder.build();
 }
 
+/**
+ *  @brief Create a message.
+ */
 std::shared_ptr<vsomeip::message>  createMessage() {
     std::shared_ptr<vsomeip::message> message;
     message = vsomeip::runtime::get()->create_request();
@@ -320,7 +196,7 @@ TEST(SomeipHandlerStandaloneTests, SomeipHandlerServerConstructorTest) {
 }
 
 /**
- * @brief Verify the behavior of onSubscription when the client is subscribed to a service.
+ *  @brief Verify the behavior of onSubscription when the client is subscribed to a service.
  */
 TEST_F(SomeipHandlerClientTests, onSubscriptionTest) {
     client_t client = 123;
@@ -334,7 +210,7 @@ TEST_F(SomeipHandlerClientTests, onSubscriptionTest) {
 }
 
 /**
- * @brief Verify the behavior of onSubscription when the client is not subscribed to a service.
+ *  @brief Verify the behavior of onSubscription when the client is not subscribed to a service.
  */
 TEST_F(SomeipHandlerClientTests, onSubscriptionNotSubscribedTest) {
     client_t client = 123;
@@ -346,64 +222,40 @@ TEST_F(SomeipHandlerClientTests, onSubscriptionNotSubscribedTest) {
     EXPECT_TRUE(result);
 }
 
-TEST_F(SomeipHandlerClientTests, OnSubscriptionStatus_SubscribedStatus_PostsMessageToQueue) {
-    // Arrange
+/**
+ *  @brief Verify the behavior of onSubscription when the client is subscribed to a service.
+ */
+TEST_F(SomeipHandlerClientTests, onSubscriptionStatusSubscribedPostsMessageToQueueTest) {
     service_t service = 0x1234;
     instance_t instance = 0x1111;
     eventgroup_t eventGroup = 0x5678;
     event_t event = 0x0001;
     uint16_t status = 0;
 
-    // Act
+    setRunning(true);
     handlerClient->onSubscriptionStatus(service, instance, eventGroup, event, status);
-
-
+    EXPECT_EQ(getQueueSize(), 1);
 }
 
-TEST_F(SomeipHandlerClientTests, OnSubscriptionStatus_UnsubscribedStatus_PostsMessageToQueue) {
-    // Arrange
+/**
+ *  @brief Verify the behavior of onSubscription when the client is not subscribed to a service.
+ */
+TEST_F(SomeipHandlerClientTests, OnSubscriptionStatusUnsubscribedPostsMessageToQueueTest) {
     service_t service = 0x1234;
     instance_t instance = 0x1111;
     eventgroup_t eventGroup = 0x5678;
     event_t event = 0x0001;
     uint16_t status = 1;
 
-    // Act
+    setRunning(true);
     handlerClient->onSubscriptionStatus(service, instance, eventGroup, event, status);
-
-}
-
-TEST_F(SomeipHandlerClientTests, OnSubscriptionStatus_ExceptionCaught_LogsErrorMessage) {
-    // Arrange
-    service_t service = 0x1234;
-    instance_t instance = 0x1111;
-    eventgroup_t eventGroup = 0x5678;
-    event_t event = 0x0001;
-    uint16_t status = 0;
-
-    // Act
-    handlerClient->onSubscriptionStatus(service, instance, eventGroup, event, status);
-
+    EXPECT_EQ(getQueueSize(), 1);
 }
 
 /**
  * @brief Ensure doesInboundSubscriptionExist returns true only when inbound subscription exists.
  */
 TEST_F(SomeipHandlerClientTests, doesInboundSubscriptionExistTest) {
-    /**
-     *  @brief Assets needed to make a UResource object.
-     */
-    uint16_t const g_uResourceIdForHandler           = 0x0102; //Method ID
-    std::string const g_uResourceNameForHandler      = "rpc";
-    std::string const g_uResourceInstanceForHandler  = "0x0102";
-    std::unique_ptr<UResource> uResource = std::make_unique<UResource>();
-    /**
-     *  @brief Set parameters of UResource object.
-     */
-    uResource->set_id(g_uResourceIdForHandler);
-    uResource->set_name(g_uResourceNameForHandler.c_str());
-    uResource->set_instance(g_uResourceInstanceForHandler);
-
     /**
      *  @brief SubscriptionStatus object. Used to add to the subscriber count using handleInboundSubscription.
      */
@@ -476,7 +328,6 @@ TEST_F(SomeipHandlerClientTests, doesSubscriptionForRemoteServiceExistTest) {
 
     std::ignore = getaddSubscriptionForRemoteService(resourceId, resourceInfo);
     EXPECT_TRUE(getdoesSubscriptionForRemoteServiceExist(eventGroup));
-    
 }
 
 /**
@@ -500,9 +351,6 @@ TEST_F(SomeipHandlerClientTests, registerMessageHandlerTest) {
  *  @brief Verify that a UResource is offered when handleOfferUResource is called.
  */
 TEST_F(SomeipHandlerClientTests, handleOfferUResourceTest) {
-    /**
-     *  @brief SubscriptionStatus object. Used to add to the subscriber count using handleInboundSubscription.
-     */
     subscriptionStatus subStatus;
     subStatus.isSubscribed = true;
     subStatus.eventgroup = g_eventGroup;
@@ -527,52 +375,267 @@ TEST_F(SomeipHandlerClientTests, handleOutboundResponseTest) {
     std::string strUUID = uprotocol::uuid::UuidSerializer::serializeToString(uMsg.attributes().reqid());
 
     EXPECT_CALL(mockSomeipInterface, send(_)).Times(0);
-
     getHandleOutboundResponse(uMsgPtr);
     addToUuidToSomeipRequestLookup(strUUID, message);
-    EXPECT_CALL(mockSomeipInterface, send(_)).Times(1);
 
+    EXPECT_CALL(mockSomeipInterface, send(_)).Times(1);
     getHandleOutboundResponse(uMsgPtr);
 }
 
 /**
- * @brief Unit test to verify the behavior of HandleOutboundMsg for RESPONSE type
+ *  @brief Unit test to verify the behavior of HandleOutboundMsg for RESPONSE type.
  */
 TEST_F(SomeipHandlerClientTests, HandleOutboundMsgResponseTest) {
-    auto const lType = UMessageType::UMESSAGE_TYPE_RESPONSE;
+    auto const type = UMessageType::UMESSAGE_TYPE_RESPONSE;
     auto uuid = Uuidv8Factory::create();
-    UAttributesBuilder builderHandler(*g_testUURI,uuid, lType, UPriority::UPRIORITY_CS4);
+    UAttributesBuilder builderHandler(*g_testUURI,uuid, type, UPriority::UPRIORITY_CS4);
     UAttributes attributesHandler = builderHandler.build();
-
     auto uMsg = std::make_shared<UMessage>(g_payloadForHandler, attributesHandler);
+    std::string strUUID = uprotocol::uuid::UuidSerializer::serializeToString(uMsg->attributes().reqid());
+    std::shared_ptr<vsomeip::message> message = createMessage();
 
+    addToUuidToSomeipRequestLookup(strUUID, message);
+    EXPECT_CALL(mockSomeipInterface, send(_)).Times(1);
     EXPECT_NO_THROW(getHandleOutboundMsg(uMsg));
 }
 
 /**
- * @brief Unit test to verify the behavior of HandleOutboundMsg for UNKNOWN type
+ *  @brief Unit test to verify the behavior of HandleOutboundMsg for UNKNOWN type
  */
 TEST_F(SomeipHandlerClientTests, HandleOutboundMsgUnknownTypeTest) {
-    auto const lType = static_cast<UMessageType>(999);
+    auto const type = static_cast<UMessageType>(999);
     auto uuid = Uuidv8Factory::create();
-    UAttributesBuilder builderHandler(*g_testUURI,uuid, lType, UPriority::UPRIORITY_CS2);
+    UAttributesBuilder builderHandler(*g_testUURI,uuid, type, UPriority::UPRIORITY_CS2);
     UAttributes attributesHandler = builderHandler.build();
-
     auto uMsg = std::make_shared<UMessage>(g_payloadForHandler, attributesHandler);
+    std::shared_ptr<vsomeip::message> message = createMessage();
+    std::string strUUID = uprotocol::uuid::UuidSerializer::serializeToString(uMsg->attributes().reqid());
+
+    addToUuidToSomeipRequestLookup(strUUID, message);
+    EXPECT_CALL(mockSomeipInterface, createPayload()).Times(0);
+    EXPECT_CALL(mockRouterInterface, getMessageTranslator()).Times(0);
+    EXPECT_CALL(mockSomeipInterface, send(_)).Times(0);
 
     EXPECT_NO_THROW(getHandleOutboundMsg(uMsg));
 }
 
 /**
- *  @brief Unit test to verify the behavior of postMessageToQueuee when the handler is running and the priority is invalid
+ *  @brief Unit test to verify the behavior of HandleOutboundMsg for REQUEST type
  */
-TEST_F(SomeipHandlerClientTests, TestpostMessageToQueueeWhenRunningAndPriorityInvalid) {
+TEST_F(SomeipHandlerClientTests, HandleOutboundMsgRequestTest) {
+    auto const type = UMessageType::UMESSAGE_TYPE_REQUEST;
+    auto uuid = Uuidv8Factory::create();
+    UAttributesBuilder builder(*g_testUURI,uuid, type, UPriority::UPRIORITY_CS4);
+    builder.setSink(*g_testUURI);
+    UAttributes uAttributes = builder.build();
+    MockSomeipInterface mockInterface;
+    MessageTranslator translator(mockInterface);
+    auto uMsg = std::make_shared<UMessage>(g_payloadForHandler, uAttributes);
+    std::shared_ptr<vsomeip::message> message = createMessage();
+    std::shared_ptr<vsomeip::payload> payload = vsomeip::runtime::get()->create_payload();
+
+    EXPECT_CALL(mockRouterInterface, getMessageTranslator()).Times(1).WillOnce(testing::ReturnRef(translator));
+    EXPECT_CALL(mockInterface, createRequest()).Times(1).WillOnce(Return(message));
+    EXPECT_CALL(mockInterface, createPayload()).Times(1).WillOnce(Return(payload));
+    getHandleOutboundMsg(uMsg);
+}
+
+/**
+ *  @brief Unit test to verify the behavior of postMessageToQueuee when the handler is running
+ *  and the priority is invalid.
+ */
+TEST_F(SomeipHandlerClientTests, postMessageToQueueWhenRunningAndPriorityInvalidTest) {
     unsigned long data = 123;
     std::shared_ptr<void> ptr = std::make_shared<int>(456);
     uint16_t priority = 456;
 
     bool result = handlerClient->postMessageToQueue(HandlerMsgType::Outbound, data, ptr, priority);
     EXPECT_FALSE(result);
+}
+
+/**
+ *  @brief Unit test to verify the behavior of ProcessMessage for Inbound type.
+ */
+TEST_F(SomeipHandlerClientTests, processMessageInboundTest) {
+    ON_CALL(mockRouterInterface, isStateRegistered())
+        .WillByDefault(Return(true));
+
+    ON_CALL(mockSomeipInterface, offerService(4660, 4369, '\0', 0))
+        .WillByDefault(Return());
+
+    std::shared_ptr<vsomeip::message> inboundMsg = vsomeip::runtime::get()->create_request();
+    inboundMsg->set_service(0x1234);
+    inboundMsg->set_instance(0x1111);
+    inboundMsg->set_method(0x3456);
+    inboundMsg->set_message_type(static_cast<vsomeip::message_type_e>(999));
+    std::shared_ptr< vsomeip::payload > its_payload = vsomeip::runtime::get()->create_payload();
+    std::vector< vsomeip::byte_t > its_payload_data;
+    for (vsomeip::byte_t i=0; i<10; i++) {
+        its_payload_data.push_back(i % 256);
+    }
+    its_payload->set_data(its_payload_data);
+    inboundMsg->set_payload(its_payload);
+    auto inboundItem = createQItem( HandlerMsgType::Inbound, 0UL, inboundMsg);
+    EXPECT_NO_THROW(getProcessMessage(inboundItem));
+}
+
+/**
+ *  @brief Unit test to verify the behavior of ProcessMessage for Stop type.
+ */
+TEST_F(SomeipHandlerClientTests, processMessageStopTest) {
+    ON_CALL(mockRouterInterface, isStateRegistered())
+        .WillByDefault(Return(true));
+
+    ON_CALL(mockSomeipInterface, offerService(4660, 4369, '\0', 0))
+        .WillByDefault(Return());
+
+    auto stopItem = createQItem(HandlerMsgType::Stop, 0UL, nullptr);
+
+    EXPECT_NO_THROW(getProcessMessage(stopItem));
+}
+
+/**
+ *  @brief Unit test to verify the behavior of ProcessMessage for Default type.
+ */
+TEST_F(SomeipHandlerClientTests, processMessageDefaultTest) {
+    ON_CALL(mockRouterInterface, isStateRegistered())
+        .WillByDefault(Return(true));
+
+    ON_CALL(mockSomeipInterface, offerService(4660, 4369, '\0', 0))
+        .WillByDefault(Return());
+
+    auto defaultItem = createQItem(static_cast<HandlerMsgType>(999), 0UL, nullptr);
+
+    EXPECT_NO_THROW(getProcessMessage(defaultItem));
+}
+
+/**
+ *  @brief Unit test to verify the behavior of ProcessMessage for OfferUResource type.
+ */
+TEST_F(SomeipHandlerClientTests, processMessageOfferUResourceTest) {
+    ON_CALL(mockRouterInterface, isStateRegistered())
+        .WillByDefault(Return(true));
+
+    ON_CALL(mockSomeipInterface, offerService(4660, 4369, '\0', 0))
+        .WillByDefault(Return());
+
+    auto OfferUResourceItem = createQItem(HandlerMsgType::OfferUResource, 0UL, g_testUURI);
+
+    EXPECT_NO_THROW(getProcessMessage(OfferUResourceItem));
+}
+
+/**
+ *  @brief Unit test to verify the behavior of ProcessMessage for InboundSubscriptionAck type
+ */
+TEST_F(SomeipHandlerClientTests, processMessageInboundSubscriptionAckTest) {
+    auto subscriptionStatusPtr = std::make_shared<subscriptionStatus>();
+    subscriptionStatusPtr->isSubscribed = true;  
+    subscriptionStatusPtr->eventgroup = 0x123;  
+
+    auto inboundSubscriptionAckItem = createQItem(HandlerMsgType::InboundSubscriptionAck, 0UL, subscriptionStatusPtr);
+    EXPECT_NO_THROW(getProcessMessage(inboundSubscriptionAckItem));
+}
+
+/**
+ *  @brief Unit test to verify the behavior of ProcessMessage for InboundSubscription type
+ */
+TEST_F(SomeipHandlerClientTests, processMessageInboundSubscriptionTest) {
+    auto subscriptionStatusPtr = std::make_shared<subscriptionStatus>();
+    subscriptionStatusPtr->isSubscribed = true;  
+    subscriptionStatusPtr->eventgroup = 0x123;  
+
+    auto inboundSubscriptionItem = createQItem(HandlerMsgType::InboundSubscription, 0UL, subscriptionStatusPtr);
+    EXPECT_NO_THROW(getProcessMessage(inboundSubscriptionItem));
+}
+
+TEST_F(SomeipHandlerClientTests, buildSomeipPayloadFromUMessageTest) {
+    const char* str = "100";
+    const uint8_t* data = reinterpret_cast<const uint8_t*>(str);
+    UPayload g_payloadForHandler(data, 4, UPayloadType::VALUE);
+    auto uuid = Uuidv8Factory::create();
+    UAttributesBuilder builderHandler(*g_testUURI, uuid, UMessageType::UMESSAGE_TYPE_PUBLISH, UPriority::UPRIORITY_CS2);
+    UAttributes attributesHandler = builderHandler.build();
+
+    UMessage message(g_payloadForHandler, attributesHandler);
+
+    std::vector<uint8_t> result = getBuildSomeipPayloadFromUMessage(message);
+
+    EXPECT_EQ(result.size(), 4);
+}
+
+TEST_F(SomeipHandlerClientTests, handleInboundmsgTest) {
+    std::shared_ptr<vsomeip::message> notification;
+    notification = vsomeip::runtime::get()->create_request();
+    notification->set_service(0x1234);
+    notification->set_instance(0x1111);
+    notification->set_method(0x3456);
+    notification->set_message_type(message_type_e::MT_NOTIFICATION);
+
+    std::shared_ptr< vsomeip::payload > its_payload = vsomeip::runtime::get()->create_payload();
+    std::vector< vsomeip::byte_t > its_payload_data;
+    for (vsomeip::byte_t i=0; i<10; i++) {
+        its_payload_data.push_back(i % 256);
+    }
+    its_payload->set_data(its_payload_data);
+    notification->set_payload(its_payload);
+    
+    EXPECT_NO_THROW(getHandleInboundMsg(notification));
+}
+
+TEST_F(SomeipHandlerClientTests, handleInboundmsgResponseTest) {
+    std::shared_ptr<vsomeip::message> notification;
+    notification = vsomeip::runtime::get()->create_request();
+    notification->set_service(0x1234);
+    notification->set_instance(0x1111);
+    notification->set_method(0x3456);
+    notification->set_message_type(message_type_e::MT_RESPONSE);
+
+    std::shared_ptr< vsomeip::payload > its_payload = vsomeip::runtime::get()->create_payload();
+    std::vector< vsomeip::byte_t > its_payload_data;
+    for (vsomeip::byte_t i=0; i<10; i++) {
+        its_payload_data.push_back(i % 256);
+    }
+    its_payload->set_data(its_payload_data);
+    notification->set_payload(its_payload);
+    
+    EXPECT_NO_THROW(getHandleInboundMsg(notification));
+}
+/**
+ *  @brief Test case for queueOfferUResource when handler is not running.
+ */
+TEST_F(SomeipHandlerClientTests, queueOfferUResourceRunningHandlerTest) {
+    std::shared_ptr<UUri> uriPtr = g_testUURI;
+
+    setRunning(true);
+    handlerClient->queueOfferUResource(uriPtr);
+}
+
+/**
+ *  @brief Test case for queueOfferUResource when handler is not running.
+ */
+TEST_F(SomeipHandlerClientTests, onMessageTest) {
+    std::shared_ptr<vsomeip::message> notification;
+    notification = vsomeip::runtime::get()->create_request();
+    notification->set_service(0x1234);
+    notification->set_instance(0x1111);
+    notification->set_method(0x3456);
+    notification->set_message_type(message_type_e::MT_RESPONSE);
+
+    std::shared_ptr< vsomeip::payload > its_payload = vsomeip::runtime::get()->create_payload();
+    std::vector< vsomeip::byte_t > its_payload_data;
+    for (vsomeip::byte_t i=0; i<10; i++) {
+        its_payload_data.push_back(i % 256);
+    }
+    its_payload->set_data(its_payload_data);
+    notification->set_payload(its_payload);
+
+    setRunning(true);
+    handlerClient->onMessage(notification);
+}
+
+TEST_F(SomeipHandlerClientTests, quitTest){
+    setRunning(true);
+    EXPECT_NO_THROW(getQuit());
 }
 
 /**
