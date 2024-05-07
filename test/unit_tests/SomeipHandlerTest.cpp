@@ -495,6 +495,21 @@ TEST_F(SomeipHandlerClientTests, processMessageStopTest) {
 }
 
 /**
+ *  @brief Unit test to verify the behavior of ProcessMessage for outbound type.
+ */
+TEST_F(SomeipHandlerClientTests, processMessageOutboundTest) {
+    std::shared_ptr<vsomeip::message> message = createMessage();
+    message->set_message_type(message_type_e::MT_REQUEST);
+    MockSomeipInterface mockInterface;
+    MessageTranslator translator(mockInterface);
+
+    gethandleOfferUResource(g_testUURI);
+
+    auto qItem = createQItem(HandlerMsgType::Outbound, 0UL, message);
+    getProcessMessage(qItem);
+}
+
+/**
  *  @brief Unit test to verify the behavior of ProcessMessage for Default type.
  */
 TEST_F(SomeipHandlerClientTests, processMessageDefaultTest) {
@@ -548,6 +563,9 @@ TEST_F(SomeipHandlerClientTests, processMessageInboundSubscriptionTest) {
     EXPECT_NO_THROW(getProcessMessage(inboundSubscriptionItem));
 }
 
+/**
+ *  @brief Verify that a payload is created from the UMessage.
+ */
 TEST_F(SomeipHandlerClientTests, buildSomeipPayloadFromUMessageTest) {
     const char* str = "100";
     const uint8_t* data = reinterpret_cast<const uint8_t*>(str);
@@ -557,48 +575,9 @@ TEST_F(SomeipHandlerClientTests, buildSomeipPayloadFromUMessageTest) {
     UAttributes attributesHandler = builderHandler.build();
 
     UMessage message(g_payloadForHandler, attributesHandler);
-
     std::vector<uint8_t> result = getBuildSomeipPayloadFromUMessage(message);
 
     EXPECT_EQ(result.size(), 4);
-}
-
-TEST_F(SomeipHandlerClientTests, handleInboundmsgTest) {
-    std::shared_ptr<vsomeip::message> notification;
-    notification = vsomeip::runtime::get()->create_request();
-    notification->set_service(0x1234);
-    notification->set_instance(0x1111);
-    notification->set_method(0x3456);
-    notification->set_message_type(message_type_e::MT_NOTIFICATION);
-
-    std::shared_ptr< vsomeip::payload > its_payload = vsomeip::runtime::get()->create_payload();
-    std::vector< vsomeip::byte_t > its_payload_data;
-    for (vsomeip::byte_t i=0; i<10; i++) {
-        its_payload_data.push_back(i % 256);
-    }
-    its_payload->set_data(its_payload_data);
-    notification->set_payload(its_payload);
-    
-    EXPECT_NO_THROW(getHandleInboundMsg(notification));
-}
-
-TEST_F(SomeipHandlerClientTests, handleInboundmsgResponseTest) {
-    std::shared_ptr<vsomeip::message> notification;
-    notification = vsomeip::runtime::get()->create_request();
-    notification->set_service(0x1234);
-    notification->set_instance(0x1111);
-    notification->set_method(0x3456);
-    notification->set_message_type(message_type_e::MT_RESPONSE);
-
-    std::shared_ptr< vsomeip::payload > its_payload = vsomeip::runtime::get()->create_payload();
-    std::vector< vsomeip::byte_t > its_payload_data;
-    for (vsomeip::byte_t i=0; i<10; i++) {
-        its_payload_data.push_back(i % 256);
-    }
-    its_payload->set_data(its_payload_data);
-    notification->set_payload(its_payload);
-    
-    EXPECT_NO_THROW(getHandleInboundMsg(notification));
 }
 
 /**
@@ -612,7 +591,7 @@ TEST_F(SomeipHandlerClientTests, queueOfferUResourceRunningHandlerTest) {
 }
 
 /**
- *  @brief Test case for queueOfferUResource when handler is not running.
+ *  @brief Test to ensure a message is posted to the queue through onMessage if handler has a thread active.
  */
 TEST_F(SomeipHandlerClientTests, onMessageTest) {
     std::shared_ptr<vsomeip::message> notification;
@@ -632,11 +611,34 @@ TEST_F(SomeipHandlerClientTests, onMessageTest) {
 
     setRunning(true);
     handlerClient->onMessage(notification);
+    EXPECT_EQ(getQueueSize(), 1);
 }
 
+/**
+ *  @brief Ensure quit clears the queue.
+ */
 TEST_F(SomeipHandlerClientTests, quitTest){
+    std::shared_ptr<vsomeip::message> notification;
+    notification = vsomeip::runtime::get()->create_request();
+    notification->set_service(0x1234);
+    notification->set_instance(0x1111);
+    notification->set_method(0x3456);
+    notification->set_message_type(message_type_e::MT_RESPONSE);
+
+    std::shared_ptr< vsomeip::payload > its_payload = vsomeip::runtime::get()->create_payload();
+    std::vector< vsomeip::byte_t > its_payload_data;
+    for (vsomeip::byte_t i=0; i<10; i++) {
+        its_payload_data.push_back(i % 256);
+    }
+    its_payload->set_data(its_payload_data);
+    notification->set_payload(its_payload);
+
     setRunning(true);
-    EXPECT_NO_THROW(getQuit());
+    handlerClient->onMessage(notification);
+    EXPECT_EQ(getQueueSize(), 1);
+
+    getQuit();
+    EXPECT_EQ(getQueueSize(), 0);
 }
 
 /**
@@ -732,7 +734,6 @@ TEST_F(SomeipHandlerClientTests, handleOutboundNotificationSubTest) {
 
     gethandleOfferUResource(g_testUURI);
     gethandleInboundSubscription(subStatusPtr);
-
     EXPECT_CALL(mockSomeipInterface, createPayload()).Times(1).WillOnce(testing::Return(payload));
     EXPECT_CALL(mockSomeipInterface, notify(_, _, _, _, _)).Times(1);
     getHandleOutboundMsg(uMsgPtr);
@@ -758,6 +759,7 @@ TEST_F(SomeipHandlerClientTests, handleInboundRequestTest) {
  */
 TEST_F(SomeipHandlerClientTests, handleInboundResponseTest) {
     std::shared_ptr<vsomeip::message> message = createMessage();
+    message->set_message_type(message_type_e::MT_RESPONSE);
     MockSomeipInterface mockInterface;
     MessageTranslator translator(mockInterface);
     request_t requestId= 0x1230456;
@@ -765,12 +767,12 @@ TEST_F(SomeipHandlerClientTests, handleInboundResponseTest) {
         std::make_shared<uprotocol::utransport::UMessage>(g_messageHandler);
 
     EXPECT_CALL(mockRouterInterface, getMessageTranslator()).Times(0);
-    getHandleInboundResponse(message);
+    getHandleInboundMsg(message);
 
     addToSomeipReqIdToUTransportRequestLookup(requestId, uMsgPtr);
     EXPECT_CALL(mockRouterInterface, getMessageTranslator()).Times(1).WillOnce(testing::ReturnRef(translator));
     EXPECT_CALL(mockRouterInterface, routeInboundMsg(_)).Times(1);
-    getHandleInboundResponse(message);
+    getHandleInboundMsg(message);
 }
 
 /**
@@ -802,6 +804,7 @@ TEST_F(SomeipHandlerClientTests, handleInboundSubscriptionAckTest) {
  */
 TEST_F(SomeipHandlerClientTests, handleInboundNotificationTest) {
     std::shared_ptr<vsomeip::message> message = createMessage();
+    message->set_message_type(message_type_e::MT_NOTIFICATION);
     UResourceId_t resourceId = 0x0102;
     std::unique_ptr<UResource> resource = createUResource();
     std::shared_ptr<ResourceInformation> resourceInfo = std::make_shared<ResourceInformation>(*resource);
@@ -810,12 +813,12 @@ TEST_F(SomeipHandlerClientTests, handleInboundNotificationTest) {
 
     EXPECT_CALL(mockRouterInterface, getMessageTranslator()).Times(0).WillOnce(testing::ReturnRef(translator));
     EXPECT_CALL(mockRouterInterface, routeInboundMsg(_)).Times(0);
-    getHandleInboundNotification(message);
+    getHandleInboundMsg(message);
 
     getaddSubscriptionForRemoteService(resourceId, resourceInfo);
     EXPECT_CALL(mockRouterInterface, getMessageTranslator()).Times(1).WillOnce(testing::ReturnRef(translator));
     EXPECT_CALL(mockRouterInterface, routeInboundMsg(_)).Times(1);
-    getHandleInboundNotification(message);
+    getHandleInboundMsg(message);
 }
 
 /**
