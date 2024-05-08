@@ -118,6 +118,7 @@ protected:
      */
     void TearDown() override {
     }
+
 };
 
 // /**
@@ -149,4 +150,12 @@ TEST_F(VsomeipUTransportTests, receiveTest) {
                                                            g_attributesForTransport);
 
     EXPECT_EQ(status.code(), UCode::UNIMPLEMENTED);
+}
+/**
+ *  @brief Test that terminate function properly terminates the VsomeipUTransport.
+ */
+TEST_F(VsomeipUTransportTests, terminateTest) {
+    UStatus status = VsomeipUTransport::instance().terminate();
+
+    EXPECT_EQ(status.code(), UCode::OK);
 }
