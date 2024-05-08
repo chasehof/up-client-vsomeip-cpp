@@ -7,6 +7,9 @@ TEST(SampleTest, Equality) {
     EXPECT_EQ(1, 1);
 }
 
+/**
+ *  @brief main test function. It initializes the listener for all testing.
+ */
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
 

@@ -25,10 +25,41 @@ using namespace up::vsomeip_client;
 using ::testing::_;
 
 /**
+ *  @brief SomeipHandler test fixture for a SomeipHandler Server type.
+ */
+class SomeipHandlerServerTests : public ::testing::Test {
+protected:
+    /**
+     *  @brief Mocks for SomeipHandler.
+     */
+    ::testing::NiceMock<MockSomeipInterface> mockSomeipInterface;
+    ::testing::NiceMock<MockSomeipRouterInterface> mockRouterInterface;
+    /**
+     *  @brief SomeipHandler object for testing.
+     */
+    std::unique_ptr<SomeipHandler> handlerServer;
+    /**
+     *  @brief UEntity and UAuthority objects for initializing handler.
+     */
+    UEntity uEntity;
+    UAuthority uAuthority;
+
+    /**
+     *  @brief Setup for SomeipHandler. Initializes required variables.
+     */
+    void SetUp() override;
+
+    /**
+     *  @brief Teardown for SomeipHandler.
+     */
+    void TearDown() override;
+};
+
+/**
  *  @brief SomeipHandler test fixture for a SomeipHandler client type.
  */
 class SomeipHandlerClientTests : public ::testing::Test {
-protected: 
+protected:
     /**
      *  @brief Mocks for SomeipHandler.
      */
@@ -48,6 +79,7 @@ protected:
      *  @brief Setup for SomeipHandler. Initializes required variables.
      */
     void SetUp() override;
+    
     /**
      *  @brief Teardown for SomeipHandler.
      */
@@ -158,5 +190,27 @@ protected:
     void getHandleInboundMsg(std::shared_ptr<message> const msg){
         handlerClient->handleInboundMsg(msg);
     }
+
+/**
+ *  @brief Member variables for testing.
+ */
+static service_t const service = 0x1234;
+static eventgroup_t const eventGroup = 0x0102;
 };
+
+/**
+ *  @brief Create a UResource object.
+ */
+std::unique_ptr<UResource> createUResource();
+
+/**
+ *  @brief Build a UAttributes object.
+ */
+UAttributes createUAttributes(UMessageType type = UMESSAGE_TYPE_PUBLISH);
+
+/**
+ *  @brief Create a message object for testing.
+ */
+std::shared_ptr<vsomeip::message> createMessage();
+
 #endif /* SOMEIP_HANDLER_TEST_HPP */

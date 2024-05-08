@@ -75,20 +75,25 @@ protected:
     std::shared_ptr<::testing::NiceMock<MockApplication>> mockApp_;
 
     /**
-     *  @brief Setup for MessageTranslator. Initializes required variables.
+     *  @brief Setup for MessageTranslator that is shared between tests.
      */
-
-    static void SetUpTestCase(){
+    static void SetUpTestCase() {
 
         g_publishTypeForTranslator = UMessageType::UMESSAGE_TYPE_PUBLISH;
     }
-    static void TearDownTestCase(){
 
+    /**
+     *  @brief Teardown for MessageTranslator that is shared between tests.
+     */
+    static void TearDownTestCase() {
     }
 
+    /**
+     *  @brief Setup for MessageTranslator.
+     */
     void SetUp() override {
-
     }
+
     /**
      *  @brief Teardown for MessageTranslator.
      */
