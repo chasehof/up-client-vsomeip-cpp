@@ -95,10 +95,6 @@ protected:
         handlerClient->handleOutboundResponse(message);
     }
 
-    void getHandleInboundRequest(std::shared_ptr<message> message) {
-        handlerClient->handleInboundRequest(message);
-    }
-
     void addToUuidToSomeipRequestLookup(std::string strUUID, std::shared_ptr<message> msg) {
         handlerClient->uuidToSomeipRequestLookup_.insert({strUUID, msg});
     }
@@ -122,20 +118,16 @@ protected:
         handlerClient->handleInboundSubscriptionAck(subStatus);
     }
 
-    void getHandleInboundResponse(std::shared_ptr<message> msg) {
-        handlerClient->handleInboundResponse(msg);
-    }
-
     void addToSomeipReqIdToUTransportRequestLookup(request_t requestId, std::shared_ptr<UMessage> uMsgPtr) {
         handlerClient->someipReqIdToUTransportRequestLookup_.insert({requestId, uMsgPtr});
     }
 
-    void getHandleInboundNotification(std::shared_ptr<message> msg) {
-        handlerClient->handleInboundNotification(msg);
-    }
-
     void setIsReadable(bool isReadable) {
         handlerClient->isServiceAvailable_.setValueAndNotify(isReadable);
+    }
+
+    bool getIsReadable() {
+        return handlerClient->isServiceAvailable_.isReadable();
     }
 
     bool doesRequestExist(request_t requestId) {
