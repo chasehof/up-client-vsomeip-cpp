@@ -17,6 +17,7 @@
 #include "rapidjson/document.h"
 #include <fstream>
 #include <filesystem>
+#include <unistd.h>
 #include "MockSomeipInterface.hpp"
 #include "MockSomeipRouterInterface.hpp"
 #include "MockSomeipHandler.hpp"
@@ -121,14 +122,14 @@ TEST(RouterStandalone, init){
 
 
 TEST_F(SomeipRouterTests, TestGetUriList) {
-    std::string serviceType = "remoteServices";
-    std::string configFile = "/home/mz7s3b/projects2/uspace/ultifi/up-client-vsomeip-cpp/config/someip-config.json";
-    setenv("VSOMEIP_CONFIGURATION", configFile.c_str(), 1);
 
-    auto actualUriList = getUriList(serviceType);
+std::string serviceType = "remoteServices";
 
-    ASSERT_NE(actualUriList, nullptr);
-    EXPECT_EQ(actualUriList->size(), 2);
+auto actualUriList = getUriList(serviceType);
+
+ASSERT_NE(actualUriList, nullptr);
+EXPECT_EQ(actualUriList->size(), 2);
+
 }
 
 TEST_F(SomeipRouterTests, TestOnState) {
