@@ -64,8 +64,8 @@ $ export LOCAL_VSOMEIP_PATH=/usr/local
 $ conan create .
 ```
 
-## 4. Examples & using the library
-Examples provided, are the best place to start customization and learn about how to use the library.
+## 4. Examples
+Refer to [EXAMPLES](examples/README.md)
 
 Refer to the [EXAMPLES](examples/README.md)
 

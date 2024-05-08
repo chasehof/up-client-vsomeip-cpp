@@ -12,7 +12,6 @@
 #include <up-cpp/uuid/factory/Uuidv8Factory.h>
 #include <up-cpp/uuid/serializer/UuidSerializer.h>
 
-
 using ::testing::Return;
 using namespace uprotocol::utransport;
 using namespace uprotocol::uuid;
@@ -56,7 +55,6 @@ protected:
      *  @brief Teardown for SomeipRouter.
      */
     void TearDown() override {
-
     }
 };
 
@@ -64,7 +62,6 @@ protected:
  *  @brief Build a UMessage needed for testing.
  */
 UMessage buildUMessage(UMessageType type, UPriority priority) {
-    // Setup
     auto uuid = Uuidv8Factory::create();
     std::shared_ptr<UUri> uRI = buildUURI();
     UAttributesBuilder builder(*uRI, uuid, type, priority);
@@ -73,7 +70,6 @@ UMessage buildUMessage(UMessageType type, UPriority priority) {
     uint8_t buffer[10] = {0}; 
     UPayload payload(buffer, sizeof(buffer), UPayloadType::VALUE);
 
-    // Build the UMessage
     UMessage umsg(payload, attributes);
 
     return umsg;
@@ -83,29 +79,19 @@ UMessage buildUMessage(UMessageType type, UPriority priority) {
  *  @brief Verify routeInboundSubscription() returns true.
  */
 TEST_F(SomeipRouterTests, TestRouteInboundSubscription) {
-    // Arrange
     std::string strTopic = "test_topic";
     bool isSubscribe = true;
 
-    // Act
     bool result = router->routeInboundSubscription(strTopic, isSubscribe);
 
-    // Assert
     EXPECT_TRUE(result);
 }
 
 /**
-
 *  @brief Verify init() successfully initializes a SomeipRouter object.
-
 */
-
 TEST_F(SomeipRouterTests, routeInboundMsgTest) {
-
     uprotocol::utransport::UMessage umsg;
-
     EXPECT_CALL(mockListener,  onReceive(::testing::_)).Times(1);
-
     EXPECT_TRUE(router->routeInboundMsg(umsg));
-
 }

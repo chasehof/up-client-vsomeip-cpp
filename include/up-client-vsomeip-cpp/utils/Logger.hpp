@@ -30,7 +30,13 @@
 #include <csignal>
 
 void handleLogLevelSignal(int signal, siginfo_t *sip, void *ptr);
-void setupLogger();
+
+/**
+ *  @brief Set up the logger for spdlog with the required parameters.
+ *
+ *  @param logger - spdlog optional pointer.
+ */
+void setupLogger(std::shared_ptr<spdlog::logger> logger = nullptr);
 
 //* Sys Logging */
 #define LogTrace(...)        SPDLOG_INFO(__VA_ARGS__)

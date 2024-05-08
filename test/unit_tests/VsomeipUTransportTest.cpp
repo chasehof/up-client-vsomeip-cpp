@@ -107,6 +107,7 @@ protected:
      *  @brief UListener object for testing.
      */
     TestListener listener_;
+
     /**
      *  @brief Setup for VsomeipUTransport.
      */
@@ -118,7 +119,6 @@ protected:
      */
     void TearDown() override {
     }
-
 };
 
 // /**
@@ -151,6 +151,7 @@ TEST_F(VsomeipUTransportTests, receiveTest) {
 
     EXPECT_EQ(status.code(), UCode::UNIMPLEMENTED);
 }
+
 /**
  *  @brief Test that terminate function properly terminates the VsomeipUTransport.
  */
