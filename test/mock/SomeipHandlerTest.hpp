@@ -29,9 +29,18 @@ using ::testing::_;
  */
 class SomeipHandlerClientTests : public ::testing::Test {
 protected: 
+    /**
+     *  @brief Mocks for SomeipHandler.
+     */
     ::testing::NiceMock<MockSomeipInterface> mockSomeipInterface;
     ::testing::NiceMock<MockSomeipRouterInterface> mockRouterInterface;
+    /**
+     *  @brief SomeipHandler object for testing.
+     */
     std::unique_ptr<SomeipHandler> handlerClient;
+    /**
+     *  @brief UEntity and UAuthority objects for initializing handler.
+     */
     UEntity uEntity;
     UAuthority uAuthority;
 
@@ -44,12 +53,15 @@ protected:
      */
     void TearDown() override;
 
+    /**
+     *  @brief Create a UMessage object.
+     */
     std::unique_ptr<SomeipHandler::QItem> createQItem(HandlerMsgType type, unsigned long messageData, std::shared_ptr<void> uMsgPtr) {
         return std::make_unique<SomeipHandler::QItem>(type, messageData, uMsgPtr);
     }
 
     /**
-     *  @brief Getters for private methods in SomeipHandler.
+     *  @brief Getters/setters for private methods and variables in SomeipHandler.
      */
     bool getDoesInboundSubscriptionExist(eventgroup_t const eventGroup) {
         return handlerClient->doesInboundSubscriptionExist(eventGroup);
@@ -101,10 +113,6 @@ protected:
 
     void getHandleSubscriptionRequestForRemoteService(std::shared_ptr<uprotocol::utransport::UMessage> const uMsg) {
         handlerClient->handleSubscriptionRequestForRemoteService(uMsg);
-    }
-
-    void getHandleOutboundNotification(std::shared_ptr<UMessage> const uMsgPtr) {
-        handlerClient->handleOutboundNotification(uMsgPtr);
     }
 
     void getHandleOutboundMsg(std::shared_ptr<UMessage> const uMsg) {

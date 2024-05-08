@@ -143,7 +143,7 @@ std::shared_ptr<vsomeip::message>  createMessage() {
 /**
  *  @brief Test to ensure the SomeipHandler constructor executes properly for client handlers.
  */
-TEST(SomeipHandlerStandaloneTests, SomeipHandlerClientConstructorTest) {
+TEST(SomeipHandlerStandaloneTests, someipHandlerClientConstructorTest) {
     ::testing::NiceMock<MockSomeipInterface> mockSomeipInterface;
     ::testing::NiceMock<MockSomeipRouterInterface> mockRouterInterface;
     std::unique_ptr<SomeipHandler> handlerClient;
@@ -171,7 +171,7 @@ TEST(SomeipHandlerStandaloneTests, SomeipHandlerClientConstructorTest) {
 /**
  *  @brief Test to ensure the SomeipHandler constructor executes properly for server handlers.
  */
-TEST(SomeipHandlerStandaloneTests, SomeipHandlerServerConstructorTest) {
+TEST(SomeipHandlerStandaloneTests, someipHandlerServerConstructorTest) {
     ::testing::NiceMock<MockSomeipInterface> mockSomeipInterface;
     ::testing::NiceMock<MockSomeipRouterInterface> mockRouterInterface;
     std::unique_ptr<SomeipHandler> handlerServer;
@@ -226,29 +226,27 @@ TEST_F(SomeipHandlerClientTests, onSubscriptionNotSubscribedTest) {
  *  @brief Verify the behavior of onSubscription when the client is subscribed to a service.
  */
 TEST_F(SomeipHandlerClientTests, onSubscriptionStatusSubscribedPostsMessageToQueueTest) {
-    service_t service = 0x1234;
     instance_t instance = 0x1111;
     eventgroup_t eventGroup = 0x5678;
     event_t event = 0x0001;
     uint16_t status = 0;
 
     setRunning(true);
-    handlerClient->onSubscriptionStatus(service, instance, eventGroup, event, status);
+    handlerClient->onSubscriptionStatus(g_service, instance, eventGroup, event, status);
     EXPECT_EQ(getQueueSize(), 1);
 }
 
 /**
  *  @brief Verify the behavior of onSubscription when the client is not subscribed to a service.
  */
-TEST_F(SomeipHandlerClientTests, OnSubscriptionStatusUnsubscribedPostsMessageToQueueTest) {
-    service_t service = 0x1234;
+TEST_F(SomeipHandlerClientTests, onSubscriptionStatusUnsubscribedPostsMessageToQueueTest) {
     instance_t instance = 0x1111;
     eventgroup_t eventGroup = 0x5678;
     event_t event = 0x0001;
     uint16_t status = 1;
 
     setRunning(true);
-    handlerClient->onSubscriptionStatus(service, instance, eventGroup, event, status);
+    handlerClient->onSubscriptionStatus(g_service, instance, eventGroup, event, status);
     EXPECT_EQ(getQueueSize(), 1);
 }
 
@@ -384,7 +382,7 @@ TEST_F(SomeipHandlerClientTests, handleOutboundResponseTest) {
 /**
  *  @brief Unit test to verify the behavior of HandleOutboundMsg for RESPONSE type.
  */
-TEST_F(SomeipHandlerClientTests, HandleOutboundMsgResponseTest) {
+TEST_F(SomeipHandlerClientTests, handleOutboundMsgResponseTest) {
     auto const type = UMessageType::UMESSAGE_TYPE_RESPONSE;
     auto uuid = Uuidv8Factory::create();
     UAttributesBuilder builderHandler(*g_testUURI,uuid, type, UPriority::UPRIORITY_CS4);
@@ -925,12 +923,11 @@ TEST_F(SomeipHandlerClientTests, queueOutboundMsgTest) {
  *  @brief Verify that the service availability is set to true only when isAvailable is true.
  */
 TEST_F(SomeipHandlerClientTests, onAvailabilityTest) {
-    service_t service = 0x1234;
     instance_t instance = 0x1111;
     bool isAvailable = true;
 
     EXPECT_FALSE(getIsReadable());
 
-    handlerClient->onAvailability(service, instance, isAvailable);
+    handlerClient->onAvailability(g_service, instance, isAvailable);
     EXPECT_TRUE(getIsReadable());
 }
