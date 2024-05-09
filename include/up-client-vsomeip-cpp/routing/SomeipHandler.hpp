@@ -181,8 +181,6 @@ struct subscriptionStatus {
      */
     vsomeip_v3::eventgroup_t eventgroup;
 };
-class SomeipHandlerServerTests;
-class SomeipHandlerClientTests;
 
 /**
  *    @brief Handler for SomeIp messages. Adds messages to queues,

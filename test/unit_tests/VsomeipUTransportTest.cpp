@@ -121,16 +121,6 @@ protected:
     }
 };
 
-// /**
-//  *  @brief Test that registerListener properly registers a UListener.
-//  */
-// TEST(VsomeipUTransportstandalonetests, registerListenerTest) {
-//     TestListener listener_;
-//     UStatus status = VsomeipUTransport::instance().registerListener(*g_testUURI, listener_);
-
-//     EXPECT_EQ(status.code(), UCode::OK);
-// }
-
 /**
  *  @brief Test that unregisterListener properly unregisters a UListener. Not yet implemented.
  */
